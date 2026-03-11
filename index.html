@@ -758,18 +758,51 @@
 
       <hr style="border:none;border-top:1px solid var(--bg3)"/>
 
-      <!-- ANTHROPIC API KEY -->
+      <hr style="border:none;border-top:1px solid var(--bg3)"/>
+
+      <!-- IA: PROVEDOR + CHAVES -->
       <div>
-        <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🤖 Assistente IA (Claude)</div>
-        <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1d4ed8;line-height:1.7;margin-bottom:10px">
-          Obtenha sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1d4ed8;font-weight:600">console.anthropic.com</a>. Ela fica salva <strong>apenas neste navegador</strong>, nunca é enviada para terceiros.
+        <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🤖 Assistente IA — provedor</div>
+
+        <!-- Seletor de provedor -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="ai-provider-btn" data-provider="anthropic" style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid var(--bg3);background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:all .2s">
+            <span style="font-size:18px">🟠</span>
+            <span style="font-size:12px;font-family:var(--font-mono);color:var(--text2);font-weight:600">Claude</span>
+            <span style="font-size:10px;color:var(--text3)">Anthropic</span>
+          </button>
+          <button class="ai-provider-btn" data-provider="openai" style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid var(--bg3);background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:all .2s">
+            <span style="font-size:18px">🟢</span>
+            <span style="font-size:12px;font-family:var(--font-mono);color:var(--text2);font-weight:600">GPT-4o</span>
+            <span style="font-size:10px;color:var(--text3)">OpenAI</span>
+          </button>
         </div>
-        <label class="lbl">Chave de API da Anthropic</label>
-        <div style="display:flex;gap:8px">
-          <input class="inp" id="anthropic-key-input" type="password" placeholder="sk-ant-..." style="font-family:var(--font-mono);font-size:13px;flex:1"/>
-          <button class="btn btn-blue" id="btn-save-anthropic-key" style="flex-shrink:0;white-space:nowrap">Salvar</button>
+
+        <!-- Chave Anthropic -->
+        <div id="section-anthropic-key">
+          <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1d4ed8;line-height:1.7;margin-bottom:10px">
+            Obtenha sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1d4ed8;font-weight:600">console.anthropic.com</a>. Salva <strong>apenas neste navegador</strong>.
+          </div>
+          <label class="lbl">Chave de API — Anthropic</label>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="anthropic-key-input" type="password" placeholder="sk-ant-..." style="font-family:var(--font-mono);font-size:13px;flex:1"/>
+            <button class="btn btn-blue" id="btn-save-anthropic-key" style="flex-shrink:0">Salvar</button>
+          </div>
+          <div id="anthropic-key-status" style="font-size:11px;margin-top:6px;font-family:var(--font-mono);color:var(--text3)"></div>
         </div>
-        <div id="anthropic-key-status" style="font-size:11px;margin-top:6px;font-family:var(--font-mono);color:var(--text3)"></div>
+
+        <!-- Chave OpenAI -->
+        <div id="section-openai-key" style="display:none">
+          <div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;font-size:13px;color:#15803d;line-height:1.7;margin-bottom:10px">
+            Obtenha sua chave em <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#15803d;font-weight:600">platform.openai.com</a>. Salva <strong>apenas neste navegador</strong>.
+          </div>
+          <label class="lbl">Chave de API — OpenAI</label>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="openai-key-input" type="password" placeholder="sk-..." style="font-family:var(--font-mono);font-size:13px;flex:1"/>
+            <button class="btn btn-green" id="btn-save-openai-key" style="flex-shrink:0">Salvar</button>
+          </div>
+          <div id="openai-key-status" style="font-size:11px;margin-top:6px;font-family:var(--font-mono);color:var(--text3)"></div>
+        </div>
       </div>
 
       <button class="btn btn-ghost" id="btn-settings-save" style="width:100%;justify-content:center;padding:10px">Fechar</button>
@@ -2011,16 +2044,6 @@ async function sendAI() {
   const input = document.getElementById('ai-input');
   const text = input.value.trim();
   if (!text) return;
-
-  const apiKey = settings.anthropicKey || '';
-  if (!apiKey) {
-    aiMessages.push({ role:'user', content: text });
-    aiMessages.push({ role:'assistant', content:'⚙️ Configure sua chave de API da Anthropic nas **Configurações** (botão ⚙️ no canto superior direito) para usar o assistente.' });
-    renderAiMessages();
-    input.value = '';
-    return;
-  }
-
   input.value = '';
   aiMessages.push({ role:'user', content: text });
   renderAiMessages();
@@ -2035,8 +2058,43 @@ async function sendAI() {
   const m = meetings.find(m=>m.id===selectedId);
   const context = m ? `Reunião: "${m.title}" em ${fmtDate(m.date)}.\nPauta: ${m.agenda||'não informada'}.\nEncaminhamentos: ${(m.actions||[]).map(a=>a.text).join('; ')||'nenhum'}.\nParticipantes: ${(m.participants||[]).map(p=>p.name).join(', ')||'nenhum'}.` : '';
   const systemPrompt = `Você é um assistente especializado em gestão de reuniões institucionais. Responda sempre em português brasileiro. Seja objetivo e prático.${context?' Contexto da reunião atual: '+context:''}`;
+  const history = aiMessages.slice(0,-1).filter(msg => msg.role==='user'||msg.role==='assistant').map(msg=>({role:msg.role,content:msg.content}));
 
   try {
+    const reply = await callAI(systemPrompt, text, history);
+    typing.remove();
+    aiMessages.push({ role:'assistant', content: reply });
+  } catch(e) {
+    typing.remove();
+    aiMessages.push({ role:'assistant', content: noKeyMessage(e) });
+  }
+  renderAiMessages();
+}
+
+// ===== IA — CHAMADA UNIFICADA (Anthropic ou OpenAI) =====
+async function callAI(systemPrompt, userMessage, history = []) {
+  const provider = settings.aiProvider || 'anthropic';
+
+  if (provider === 'openai') {
+    const apiKey = settings.openaiKey || '';
+    if (!apiKey) throw new Error('NOKEY_openai');
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history,
+      { role: 'user', content: userMessage }
+    ];
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 1500, messages })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.choices?.[0]?.message?.content || '';
+
+  } else {
+    const apiKey = settings.anthropicKey || '';
+    if (!apiKey) throw new Error('NOKEY_anthropic');
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -2047,23 +2105,24 @@ async function sendAI() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 1500,
         system: systemPrompt,
-        messages: aiMessages.filter(msg => msg.role==='user'||msg.role==='assistant')
-                            .map(msg => ({ role: msg.role, content: msg.content }))
+        messages: [...history, { role: 'user', content: userMessage }]
       })
     });
     const data = await res.json();
-    typing.remove();
     if (data.error) throw new Error(data.error.message);
-    const reply = data.content.map(b => b.type==='text' ? b.text : '').join('');
-    aiMessages.push({ role:'assistant', content: reply });
-  } catch(e) {
-    typing.remove();
-    const msg = e.message.includes('fetch') ? 'Não foi possível conectar à API. Verifique sua conexão e a chave configurada.' : e.message;
-    aiMessages.push({ role:'assistant', content:'❌ Erro: ' + msg });
+    return data.content.map(b => b.type === 'text' ? b.text : '').join('');
   }
-  renderAiMessages();
+}
+
+function noKeyMessage(err) {
+  if (err.message === 'NOKEY_openai')
+    return '⚙️ Configure sua chave da <strong>OpenAI</strong> nas Configurações para usar o assistente.';
+  if (err.message === 'NOKEY_anthropic')
+    return '⚙️ Configure sua chave da <strong>Anthropic</strong> nas Configurações para usar o assistente.';
+  const msg = err.message.includes('fetch') ? 'Não foi possível conectar. Verifique sua conexão e a chave configurada.' : err.message;
+  return '❌ Erro: ' + msg;
 }
 
 // ===== BUSCA IA =====
@@ -2071,15 +2130,8 @@ async function aiSearch(query) {
   const resultEl = document.getElementById('ai-search-result');
   if (!query.trim()) return;
 
-  const apiKey = settings.anthropicKey || '';
-  if (!apiKey) {
-    resultEl.innerHTML = '<span style="color:#F59E0B">⚙️ Configure sua chave da Anthropic em <strong>Configurações</strong> para usar a Busca IA.</span>';
-    return;
-  }
-
   resultEl.innerHTML = '<span style="color:var(--text3)">🔎 Analisando suas reuniões...</span>';
 
-  // Monta resumo compacto de todas as reuniões para enviar ao Claude
   const resumo = meetings.map(m => ({
     id: m.id,
     titulo: m.title || 'Sem título',
@@ -2094,7 +2146,7 @@ async function aiSearch(query) {
     ).join('; ')
   }));
 
-  const systemPrompt = `Você é um assistente especializado em análise de reuniões institucionais. 
+  const systemPrompt = `Você é um assistente especializado em análise de reuniões institucionais.
 O usuário tem ${meetings.length} reunião(ões) cadastrada(s) no sistema.
 Aqui estão os dados completos em JSON:
 ${JSON.stringify(resumo, null, 2)}
@@ -2104,28 +2156,10 @@ Quando listar reuniões, use formato de lista. Quando fizer análises, destaque 
 Se a pergunta não tiver relação com os dados, diga educadamente.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: query }]
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    const reply = data.content.map(b => b.type==='text' ? b.text : '').join('');
+    const reply = await callAI(systemPrompt, query);
     resultEl.textContent = reply;
   } catch(e) {
-    const msg = e.message.includes('fetch') ? 'Não foi possível conectar. Verifique sua conexão e a chave configurada nas Configurações.' : e.message;
-    resultEl.innerHTML = `<span style="color:#EF4444">❌ Erro: ${escHtml(msg)}</span>`;
+    resultEl.innerHTML = `<span style="color:#EF4444">${noKeyMessage(e)}</span>`;
   }
 }
 
@@ -2504,26 +2538,66 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
 
 // Auto-sync configurável
 startAutoSync();
-// Inicializa UI do toggle quando o modal de settings for aberto
+
+function updateProviderUI() {
+  const p = settings.aiProvider || 'anthropic';
+  document.querySelectorAll('.ai-provider-btn').forEach(btn => {
+    const active = btn.dataset.provider === p;
+    btn.style.borderColor = active ? 'var(--accent)' : 'var(--bg3)';
+    btn.style.background  = active ? 'var(--accent)18' : 'var(--bg2)';
+  });
+  document.getElementById('section-anthropic-key').style.display = p === 'anthropic' ? 'block' : 'none';
+  document.getElementById('section-openai-key').style.display    = p === 'openai'    ? 'block' : 'none';
+}
+
+// Inicializa UI quando settings for aberto
 document.getElementById('btn-settings').addEventListener('click', () => {
   initAutoSyncUI();
-  applyTheme(settings.theme || 'light'); // atualiza botões de tema
-  // Chave Anthropic
-  const keyInput = document.getElementById('anthropic-key-input');
-  const keyStatus = document.getElementById('anthropic-key-status');
-  if (keyInput) keyInput.value = settings.anthropicKey ? '••••••••••••••••' : '';
-  if (keyStatus) keyStatus.textContent = settings.anthropicKey ? '✅ Chave configurada' : '⚠️ Nenhuma chave salva';
-  if (keyStatus) keyStatus.style.color = settings.anthropicKey ? '#15803D' : '#F59E0B';
+  applyTheme(settings.theme || 'light');
+  updateProviderUI();
+
+  // Anthropic
+  const akInput  = document.getElementById('anthropic-key-input');
+  const akStatus = document.getElementById('anthropic-key-status');
+  if (akInput)  akInput.value = settings.anthropicKey ? '••••••••••••••••' : '';
+  if (akStatus) { akStatus.textContent = settings.anthropicKey ? '✅ Chave configurada' : '⚠️ Nenhuma chave salva'; akStatus.style.color = settings.anthropicKey ? '#15803D' : '#F59E0B'; }
+
+  // OpenAI
+  const okInput  = document.getElementById('openai-key-input');
+  const okStatus = document.getElementById('openai-key-status');
+  if (okInput)  okInput.value = settings.openaiKey ? '••••••••••••••••' : '';
+  if (okStatus) { okStatus.textContent = settings.openaiKey ? '✅ Chave configurada' : '⚠️ Nenhuma chave salva'; okStatus.style.color = settings.openaiKey ? '#15803D' : '#F59E0B'; }
 });
+
+document.querySelectorAll('.ai-provider-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    settings.aiProvider = btn.dataset.provider;
+    saveSettings();
+    updateProviderUI();
+    showToast(`🤖 Provedor alterado para ${btn.dataset.provider === 'openai' ? 'OpenAI (GPT-4o)' : 'Anthropic (Claude)'}`);
+  });
+});
+
 document.getElementById('btn-save-anthropic-key')?.addEventListener('click', () => {
   const val = document.getElementById('anthropic-key-input').value.trim();
   if (!val || val.startsWith('•')) return;
   settings.anthropicKey = val;
   saveSettings();
   document.getElementById('anthropic-key-input').value = '••••••••••••••••';
-  document.getElementById('anthropic-key-status').textContent = '✅ Chave salva com sucesso!';
+  document.getElementById('anthropic-key-status').textContent = '✅ Chave salva!';
   document.getElementById('anthropic-key-status').style.color = '#15803D';
   showToast('🤖 Chave da Anthropic salva!');
+});
+
+document.getElementById('btn-save-openai-key')?.addEventListener('click', () => {
+  const val = document.getElementById('openai-key-input').value.trim();
+  if (!val || val.startsWith('•')) return;
+  settings.openaiKey = val;
+  saveSettings();
+  document.getElementById('openai-key-input').value = '••••••••••••••••';
+  document.getElementById('openai-key-status').textContent = '✅ Chave salva!';
+  document.getElementById('openai-key-status').style.color = '#15803D';
+  showToast('🤖 Chave da OpenAI salva!');
 });
 </script>
 </body>
