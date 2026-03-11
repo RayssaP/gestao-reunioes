@@ -1038,6 +1038,18 @@ function updateOdUI() {
 function save() { localStorage.setItem('reunioes-data', JSON.stringify(meetings)); }
 function saveSettings() { localStorage.setItem('reunioes-settings', JSON.stringify(settings)); }
 
+// ── Auto-sync a cada 30 minutos ──
+const AUTO_SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutos
+setInterval(async () => {
+  if (hasValidGoogleToken() || settings.odClientId) {
+    try {
+      await odLoadAll();
+    } catch(e) {
+      // Silencioso — não interrompe o usuário
+    }
+  }
+}, AUTO_SYNC_INTERVAL);
+
 // ── Restore session on page load ──
 async function restoreOdSession() {
   odLoadTokens();
@@ -1070,8 +1082,13 @@ function genId() { return Date.now().toString(36) + Math.random().toString(36).s
 
 function fmtDate(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+  // Datas no formato YYYY-MM-DD são interpretadas como UTC meia-noite,
+  // o que no fuso de Brasília (UTC-3) vira o dia anterior. Parseamos manualmente.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+  }
+  return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
 }
 function fmtDateTime(iso) {
   if (!iso) return '—';
