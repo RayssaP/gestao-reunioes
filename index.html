@@ -825,13 +825,10 @@ async function gdFindDataFile(folderId) {
 }
 
 async function uploadDriveJson(fileId, folderId, payloadObj) {
-async function uploadDriveJson(fileId, folderId, payloadObj) {
-  // IMPORTANTE: Quando fazemos PATCH (update), NÃO podemos enviar 'parents' no body
-  // O campo parents só é permitido em POST (criação)
-  const metadata = fileId 
-    ? { name: GD_FILENAME }  // UPDATE: sem parents!
-    : { name: GD_FILENAME, parents: [folderId] };  // CREATE: com parents
-    
+  const metadata = fileId
+    ? { name: GD_FILENAME }
+    : { name: GD_FILENAME, parents: [folderId] };
+
   const boundary = '-------314159265358979323846';
   const body = [
     `--${boundary}`,
@@ -844,30 +841,30 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
     JSON.stringify(payloadObj, null, 2),
     `--${boundary}--`
   ].join('\r\n');
-  
+
   const endpoint = fileId
-    ? `${DRIVE_UPLOAD}/${fileId}?uploadType=multipart`  // UPDATE
-    : `${DRIVE_UPLOAD}?uploadType=multipart`;           // CREATE
-    
+    ? `${DRIVE_UPLOAD}/${fileId}?uploadType=multipart&supportsAllDrives=false`
+    : `${DRIVE_UPLOAD}?uploadType=multipart&supportsAllDrives=false`;
+
   const method = fileId ? 'PATCH' : 'POST';
-  
+
   const r = await gfetch(endpoint, {
     method,
     headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
     body
   });
-  
+
   if (!r.ok) {
     const text = await r.text().catch(() => '');
     throw new Error(`Falha ao salvar no Google Drive (${r.status}). ${text.slice(0,160)}`);
   }
-  
+
   const data = await r.json();
   settings.gdFileId = data.id;
   saveSettings();
   return data.id;
 }
-
+ 
 async function odSaveIndex() {
   const folderId = await ensureFolder();
   const fileId = await gdFindDataFile(folderId);
