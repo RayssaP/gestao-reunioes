@@ -523,6 +523,7 @@
       <span id="od-btn-label">Drive</span>
     </button>
     <button class="btn btn-ghost" id="btn-ai-toggle">✨ <span class="btn-label-ai">Assistente IA</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>
     <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
@@ -595,6 +596,35 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- AI SEARCH MODAL -->
+<div class="modal-overlay hidden" id="modal-ai-search">
+  <div class="modal" style="max-width:620px;width:calc(100vw - 32px);max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title">🔎 Busca Inteligente</div>
+      <button class="modal-close" id="btn-ai-search-close">×</button>
+    </div>
+    <div style="flex-shrink:0;padding:0 0 14px">
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="ai-search-input" placeholder="Ex: reuniões sobre licitação, encaminhamentos do João, reuniões de março..." style="flex:1;font-size:14px"/>
+        <button class="btn btn-primary" id="btn-ai-search-send" style="flex-shrink:0;padding:9px 18px;font-size:14px">Buscar</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="ai-search-suggestions">
+        <button class="chip" data-sq="Quais reuniões tiveram encaminhamentos vencidos?">encaminhamentos vencidos</button>
+        <button class="chip" data-sq="Liste as reuniões realizadas com mais participantes">mais participantes</button>
+        <button class="chip" data-sq="Quais pautas se repetiram em mais de uma reunião?">pautas recorrentes</button>
+        <button class="chip" data-sq="Mostre os encaminhamentos pendentes por responsável">pendentes por responsável</button>
+        <button class="chip" data-sq="Qual foi a reunião mais recente?">última reunião</button>
+      </div>
+    </div>
+    <div id="ai-search-result" style="flex:1;overflow-y:auto;padding:14px 16px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3);font-size:14px;line-height:1.8;color:var(--text);min-height:80px;white-space:pre-wrap">
+      <span style="color:var(--text3);font-style:italic">Faça uma pergunta sobre suas reuniões...</span>
+    </div>
+    <div style="flex-shrink:0;margin-top:12px;display:flex;justify-content:flex-end">
+      <button class="btn btn-ghost" id="btn-ai-search-cancel">Fechar</button>
+    </div>
+  </div>
 </div>
 
 <!-- SETTINGS MODAL -->
@@ -2036,6 +2066,69 @@ async function sendAI() {
   renderAiMessages();
 }
 
+// ===== BUSCA IA =====
+async function aiSearch(query) {
+  const resultEl = document.getElementById('ai-search-result');
+  if (!query.trim()) return;
+
+  const apiKey = settings.anthropicKey || '';
+  if (!apiKey) {
+    resultEl.innerHTML = '<span style="color:#F59E0B">⚙️ Configure sua chave da Anthropic em <strong>Configurações</strong> para usar a Busca IA.</span>';
+    return;
+  }
+
+  resultEl.innerHTML = '<span style="color:var(--text3)">🔎 Analisando suas reuniões...</span>';
+
+  // Monta resumo compacto de todas as reuniões para enviar ao Claude
+  const resumo = meetings.map(m => ({
+    id: m.id,
+    titulo: m.title || 'Sem título',
+    data: m.date || '',
+    status: m.status || '',
+    local: m.location || '',
+    participantes: (m.participants||[]).map(p=>p.name).join(', '),
+    pauta: m.agenda || '',
+    notas: m.notes || '',
+    encaminhamentos: (m.actions||[]).map(a =>
+      `${a.text}${a.responsible?' (resp: '+a.responsible+')':''}${a.deadline?' prazo: '+a.deadline:''}${a.done?' [concluído]':' [pendente]'}`
+    ).join('; ')
+  }));
+
+  const systemPrompt = `Você é um assistente especializado em análise de reuniões institucionais. 
+O usuário tem ${meetings.length} reunião(ões) cadastrada(s) no sistema.
+Aqui estão os dados completos em JSON:
+${JSON.stringify(resumo, null, 2)}
+
+Responda em português brasileiro. Seja direto, objetivo e bem organizado.
+Quando listar reuniões, use formato de lista. Quando fizer análises, destaque pontos importantes.
+Se a pergunta não tiver relação com os dados, diga educadamente.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: query }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content.map(b => b.type==='text' ? b.text : '').join('');
+    resultEl.textContent = reply;
+  } catch(e) {
+    const msg = e.message.includes('fetch') ? 'Não foi possível conectar. Verifique sua conexão e a chave configurada nas Configurações.' : e.message;
+    resultEl.innerHTML = `<span style="color:#EF4444">❌ Erro: ${escHtml(msg)}</span>`;
+  }
+}
+
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
 
@@ -2372,7 +2465,23 @@ function toggleSidebar() {
   open ? closeSidebar() : openSidebar();
 }
 
-document.getElementById('btn-sidebar-toggle').onclick = toggleSidebar;
+document.getElementById('btn-ai-search').onclick = () => {
+  document.getElementById('modal-ai-search').classList.remove('hidden');
+  document.getElementById('ai-search-input').focus();
+};
+document.getElementById('btn-ai-search-close').onclick  = () => document.getElementById('modal-ai-search').classList.add('hidden');
+document.getElementById('btn-ai-search-cancel').onclick = () => document.getElementById('modal-ai-search').classList.add('hidden');
+document.getElementById('btn-ai-search-send').onclick   = () => aiSearch(document.getElementById('ai-search-input').value);
+document.getElementById('ai-search-input').addEventListener('keydown', e => { if (e.key==='Enter') aiSearch(e.target.value); });
+document.querySelectorAll('[data-sq]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.getElementById('ai-search-input').value = b.dataset.sq;
+    aiSearch(b.dataset.sq);
+  });
+});
+document.getElementById('modal-ai-search').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-ai-search')) document.getElementById('modal-ai-search').classList.add('hidden');
+});
 document.getElementById('sidebar-overlay').onclick = closeSidebar;
 
 // Close sidebar when a meeting is selected on mobile
