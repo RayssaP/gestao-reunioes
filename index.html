@@ -230,36 +230,6 @@
   .ref-title { font-size: 14px; font-weight: 600; color: var(--text); }
   .ref-date { font-size: 12px; color: var(--text3); font-family: var(--font-mono); margin-top: 2px; }
 
-  /* AI PANEL */
-  #ai-panel { width: 340px; min-width: 340px; background: var(--bg2); border-left: 1px solid var(--bg3); display: flex; flex-direction: column; }
-  #ai-panel.hidden { display: none; }
-  .ai-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--bg3); }
-  .ai-header-row { display: flex; justify-content: space-between; align-items: center; }
-  .ai-title { font-weight: 700; font-size: 15px; color: #1E293B; }
-  .ai-close { background: none; border: none; color: var(--text3); font-size: 22px; }
-  .ai-warn { display: none !important; }
-  .ai-context { margin-top: 8px; font-size: 12px; color: var(--text3); padding: 6px 10px; background: var(--bg); border-radius: 6px; }
-  .ai-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .ai-empty { color: var(--text3); font-size: 13px; text-align: center; margin-top: 16px; }
-  .ai-empty .icon { font-size: 28px; margin-bottom: 8px; }
-  .ai-suggestions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-  .ai-suggestion { padding: 8px 12px; background: var(--bg); border: 1px solid var(--bg3); border-radius: 8px; color: var(--text2); font-size: 12px; cursor: pointer; text-align: left; transition: background 0.15s; }
-  .ai-suggestion:hover { background: var(--bg3); }
-  .ai-msg { display: flex; max-width: 85%; }
-  .ai-msg.user { align-self: flex-end; }
-  .ai-msg.assistant { align-self: flex-start; }
-  .ai-bubble { padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap; }
-  .ai-msg.user .ai-bubble { background: var(--blue); border-radius: 14px 14px 4px 14px; }
-  .ai-msg.assistant .ai-bubble { background: #F8FAFC; border: 1px solid var(--bg3); border-radius: 14px 14px 14px 4px; }
-  .ai-typing { display: flex; gap: 6px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--bg3); border-radius: 14px 14px 14px 4px; align-self: flex-start; }
-  .ai-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: bounce 1s infinite; }
-  .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
-  .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
-  .ai-input-row { padding: 12px; border-top: 1px solid var(--bg3); display: flex; flex-direction: column; gap: 8px; }
-  .ai-input-inner { display: flex; gap: 8px; }
-  .ai-clear { width: 100%; padding: 6px; background: transparent; border: 1px solid var(--bg3); border-radius: 6px; color: var(--text3); font-size: 12px; transition: background 0.15s; }
-  .ai-clear:hover { background: var(--bg3); }
-
   /* MODAL */
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
   .modal-overlay.hidden { display: none; }
@@ -375,7 +345,6 @@
     #form-view  { padding: 22px 28px; }
     .kpi-value  { font-size: 28px; }
     .kpi-grid   { gap: 10px; }
-    #ai-panel   { width: 300px; min-width: 300px; }
     .modal      { min-width: 360px; }
   }
 
@@ -386,9 +355,8 @@
     .btn-hamburger { display: flex; }
     .header-title   { font-size: 15px; }
     .header-sub     { display: none; }
-    .btn-label-ai, .btn-label-cfg { display: none; }
+    .btn-label-cfg { display: none; }
     .btn-label-new  { display: none; }
-    #btn-ai-toggle  { padding: 8px 10px; }
     #btn-settings   { padding: 8px 10px; }
     #btn-new        { padding: 8px 12px; font-size: 20px; font-weight: 700; line-height: 1; }
 
@@ -405,17 +373,6 @@
     /* Main fills full width */
     #main { flex-direction: column; overflow: hidden; }
     #content { overflow-y: auto; flex: 1; }
-
-    /* AI panel — full-width bottom sheet */
-    #ai-panel {
-      position: fixed; bottom: 0; left: 0; right: 0; top: auto;
-      width: 100% !important; min-width: 0 !important;
-      border-left: none; border-top: 1px solid var(--bg3);
-      height: 55vh; z-index: 110;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
-      border-radius: 16px 16px 0 0;
-    }
-    #ai-panel.hidden { display: none !important; }
 
     /* Dashboard */
     #view-empty { height: calc(100vh - 56px); }
@@ -468,7 +425,6 @@
   @media (max-width: 480px) {
     .kpi-grid { grid-template-columns: 1fr 1fr; }
     .kpi-value { font-size: 22px; }
-    #btn-ai-toggle { display: none; }
   }
 
   /* ── ONEDRIVE ── */
@@ -522,7 +478,6 @@
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-toggle">✨ <span class="btn-label-ai">Assistente IA</span></button>
     <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>
     <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
@@ -566,35 +521,6 @@
     </div>
 
     <!-- AI PANEL -->
-    <div id="ai-panel" class="hidden">
-      <div class="ai-header">
-        <div class="ai-header-row">
-          <div class="ai-title">✨ Assistente IA (Claude)</div>
-          <button class="ai-close" id="btn-ai-close">×</button>
-        </div>
-        <div id="ai-warn" class="ai-warn" style="display:none">⚠️ Configure sua chave OpenAI em <strong>Configurações</strong></div>
-        <div id="ai-context-label" class="ai-context" style="display:none"></div>
-      </div>
-      <div class="ai-messages" id="ai-messages">
-        <div class="ai-empty" id="ai-placeholder">
-          <div class="icon">💬</div>
-          Pergunte ao assistente sobre sua reunião, gere atas, resuma pautas, sugira encaminhamentos...
-          <div class="ai-suggestions">
-            <button class="ai-suggestion" data-q="Gere uma ata desta reunião">"Gere uma ata desta reunião"</button>
-            <button class="ai-suggestion" data-q="Sugira encaminhamentos">"Sugira encaminhamentos"</button>
-            <button class="ai-suggestion" data-q="Resuma a pauta">"Resuma a pauta"</button>
-            <button class="ai-suggestion" data-q="Liste os responsáveis">"Liste os responsáveis"</button>
-          </div>
-        </div>
-      </div>
-      <div class="ai-input-row">
-        <div class="ai-input-inner">
-          <input class="inp" id="ai-input" placeholder="Pergunte algo..." style="flex:1;font-size:13px"/>
-          <button class="btn btn-blue" id="btn-ai-send" style="padding:8px 14px">➤</button>
-        </div>
-        <button class="ai-clear" id="btn-ai-clear" style="display:none">Limpar conversa</button>
-      </div>
-    </div>
   </main>
 </div>
 
@@ -838,7 +764,6 @@ let selectedId = null;
 let currentView = 'empty';
 let filterStatus = 'Todas';
 let searchText = '';
-let aiMessages = [];
 let formData = {};
 let formTab = 'geral';
 let deleteTarget = null;
@@ -1346,7 +1271,6 @@ function selectMeeting(id) {
   const m = meetings.find(m=>m.id===id);
   if (m) renderDetail(m);
   renderSidebar();
-  updateAiContext();
 }
 
 // ===== DETAIL =====
@@ -2012,65 +1936,6 @@ function showView(v) {
   if (v==='empty') renderDashboard();
 }
 
-// ===== AI =====
-function updateAiContext() {
-  const m = meetings.find(m=>m.id===selectedId);
-  const ctx = document.getElementById('ai-context-label');
-  if (m) { ctx.textContent = 'Contexto: ' + m.title; ctx.style.display='block'; }
-  else ctx.style.display='none';
-}
-
-function renderAiMessages() {
-  const el = document.getElementById('ai-messages');
-  const ph = document.getElementById('ai-placeholder');
-  if (aiMessages.length===0) { if(ph) ph.style.display='block'; return; }
-  if (ph) ph.style.display='none';
-
-  // remove existing msgs
-  el.querySelectorAll('.ai-msg').forEach(e=>e.remove());
-  el.querySelectorAll('.ai-typing').forEach(e=>e.remove());
-
-  aiMessages.forEach(msg => {
-    const d = document.createElement('div');
-    d.className = 'ai-msg ' + msg.role;
-    d.innerHTML = `<div class="ai-bubble">${escHtml(msg.content)}</div>`;
-    el.appendChild(d);
-  });
-  el.scrollTop = el.scrollHeight;
-  document.getElementById('btn-ai-clear').style.display = 'block';
-}
-
-async function sendAI() {
-  const input = document.getElementById('ai-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  aiMessages.push({ role:'user', content: text });
-  renderAiMessages();
-
-  const el = document.getElementById('ai-messages');
-  const typing = document.createElement('div');
-  typing.className='ai-typing';
-  typing.innerHTML='<span></span><span></span><span></span>';
-  el.appendChild(typing);
-  el.scrollTop = el.scrollHeight;
-
-  const m = meetings.find(m=>m.id===selectedId);
-  const context = m ? `Reunião: "${m.title}" em ${fmtDate(m.date)}.\nPauta: ${m.agenda||'não informada'}.\nEncaminhamentos: ${(m.actions||[]).map(a=>a.text).join('; ')||'nenhum'}.\nParticipantes: ${(m.participants||[]).map(p=>p.name).join(', ')||'nenhum'}.` : '';
-  const systemPrompt = `Você é um assistente especializado em gestão de reuniões institucionais. Responda sempre em português brasileiro. Seja objetivo e prático.${context?' Contexto da reunião atual: '+context:''}`;
-  const history = aiMessages.slice(0,-1).filter(msg => msg.role==='user'||msg.role==='assistant').map(msg=>({role:msg.role,content:msg.content}));
-
-  try {
-    const reply = await callAI(systemPrompt, text, history);
-    typing.remove();
-    aiMessages.push({ role:'assistant', content: reply });
-  } catch(e) {
-    typing.remove();
-    aiMessages.push({ role:'assistant', content: noKeyMessage(e) });
-  }
-  renderAiMessages();
-}
-
 // ===== IA — CHAMADA UNIFICADA (Anthropic ou OpenAI) =====
 async function callAI(systemPrompt, userMessage, history = []) {
   const provider = settings.aiProvider || 'anthropic';
@@ -2165,23 +2030,6 @@ Se a pergunta não tiver relação com os dados, diga educadamente.`;
 
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
-
-document.getElementById('btn-ai-toggle').onclick = () => {
-  const p = document.getElementById('ai-panel');
-  p.classList.toggle('hidden');
-  updateAiContext();
-};
-
-document.getElementById('btn-ai-close').onclick = () => document.getElementById('ai-panel').classList.add('hidden');
-
-document.getElementById('btn-ai-send').onclick = sendAI;
-document.getElementById('ai-input').addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey) sendAI(); });
-
-document.querySelectorAll('.ai-suggestion').forEach(b => {
-  b.addEventListener('click', () => { document.getElementById('ai-input').value = b.dataset.q; document.getElementById('ai-input').focus(); });
-});
-
-document.getElementById('btn-ai-clear').onclick = () => { aiMessages=[]; document.getElementById('ai-messages').querySelectorAll('.ai-msg').forEach(e=>e.remove()); document.getElementById('ai-placeholder').style.display='block'; document.getElementById('btn-ai-clear').style.display='none'; };
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
 
