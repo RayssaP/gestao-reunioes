@@ -383,6 +383,7 @@
     .btn-label-search { font-size: 11px; }
     #btn-settings  { padding: 5px 8px; font-size: 13px; }
     .btn-label-cfg { display: none; }
+    .btn-label-search { display: none; }
     #btn-new       { padding: 6px 10px; font-size: 18px; font-weight: 700; line-height: 1; }
     .btn-label-new { display: none; }
 
@@ -507,8 +508,7 @@
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>
-    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -2348,6 +2348,7 @@ document.querySelectorAll('[data-sq]').forEach(b => {
 document.getElementById('modal-ai-search').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-ai-search')) document.getElementById('modal-ai-search').classList.add('hidden');
 });
+document.getElementById('btn-sidebar-toggle').onclick = toggleSidebar;
 document.getElementById('sidebar-overlay').onclick = closeSidebar;
 
 // Close sidebar when a meeting is selected on mobile
