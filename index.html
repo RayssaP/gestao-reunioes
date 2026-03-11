@@ -726,8 +726,20 @@
 
       <hr style="border:none;border-top:1px solid var(--bg3)"/>
 
-      <div style="padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;font-size:13px;color:#15803d;line-height:1.7">
-        🔒 <strong>Assistente IA</strong> — usa a API da Anthropic (Claude) de forma segura via backend. Nenhuma chave é exposta no navegador.
+      <hr style="border:none;border-top:1px solid var(--bg3)"/>
+
+      <!-- ANTHROPIC API KEY -->
+      <div>
+        <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🤖 Assistente IA (Claude)</div>
+        <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1d4ed8;line-height:1.7;margin-bottom:10px">
+          Obtenha sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1d4ed8;font-weight:600">console.anthropic.com</a>. Ela fica salva <strong>apenas neste navegador</strong>, nunca é enviada para terceiros.
+        </div>
+        <label class="lbl">Chave de API da Anthropic</label>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="anthropic-key-input" type="password" placeholder="sk-ant-..." style="font-family:var(--font-mono);font-size:13px;flex:1"/>
+          <button class="btn btn-blue" id="btn-save-anthropic-key" style="flex-shrink:0;white-space:nowrap">Salvar</button>
+        </div>
+        <div id="anthropic-key-status" style="font-size:11px;margin-top:6px;font-family:var(--font-mono);color:var(--text3)"></div>
       </div>
 
       <button class="btn btn-ghost" id="btn-settings-save" style="width:100%;justify-content:center;padding:10px">Fechar</button>
@@ -1969,11 +1981,20 @@ async function sendAI() {
   const input = document.getElementById('ai-input');
   const text = input.value.trim();
   if (!text) return;
+
+  const apiKey = settings.anthropicKey || '';
+  if (!apiKey) {
+    aiMessages.push({ role:'user', content: text });
+    aiMessages.push({ role:'assistant', content:'⚙️ Configure sua chave de API da Anthropic nas **Configurações** (botão ⚙️ no canto superior direito) para usar o assistente.' });
+    renderAiMessages();
+    input.value = '';
+    return;
+  }
+
   input.value = '';
   aiMessages.push({ role:'user', content: text });
   renderAiMessages();
 
-  // Show typing indicator
   const el = document.getElementById('ai-messages');
   const typing = document.createElement('div');
   typing.className='ai-typing';
@@ -1988,12 +2009,18 @@ async function sendAI() {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
         system: systemPrompt,
-        messages: aiMessages.map(msg => ({ role: msg.role, content: msg.content }))
+        messages: aiMessages.filter(msg => msg.role==='user'||msg.role==='assistant')
+                            .map(msg => ({ role: msg.role, content: msg.content }))
       })
     });
     const data = await res.json();
@@ -2003,7 +2030,8 @@ async function sendAI() {
     aiMessages.push({ role:'assistant', content: reply });
   } catch(e) {
     typing.remove();
-    aiMessages.push({ role:'assistant', content:'❌ Erro: '+e.message });
+    const msg = e.message.includes('fetch') ? 'Não foi possível conectar à API. Verifique sua conexão e a chave configurada.' : e.message;
+    aiMessages.push({ role:'assistant', content:'❌ Erro: ' + msg });
   }
   renderAiMessages();
 }
@@ -2371,6 +2399,22 @@ startAutoSync();
 document.getElementById('btn-settings').addEventListener('click', () => {
   initAutoSyncUI();
   applyTheme(settings.theme || 'light'); // atualiza botões de tema
+  // Chave Anthropic
+  const keyInput = document.getElementById('anthropic-key-input');
+  const keyStatus = document.getElementById('anthropic-key-status');
+  if (keyInput) keyInput.value = settings.anthropicKey ? '••••••••••••••••' : '';
+  if (keyStatus) keyStatus.textContent = settings.anthropicKey ? '✅ Chave configurada' : '⚠️ Nenhuma chave salva';
+  if (keyStatus) keyStatus.style.color = settings.anthropicKey ? '#15803D' : '#F59E0B';
+});
+document.getElementById('btn-save-anthropic-key')?.addEventListener('click', () => {
+  const val = document.getElementById('anthropic-key-input').value.trim();
+  if (!val || val.startsWith('•')) return;
+  settings.anthropicKey = val;
+  saveSettings();
+  document.getElementById('anthropic-key-input').value = '••••••••••••••••';
+  document.getElementById('anthropic-key-status').textContent = '✅ Chave salva com sucesso!';
+  document.getElementById('anthropic-key-status').style.color = '#15803D';
+  showToast('🤖 Chave da Anthropic salva!');
 });
 </script>
 </body>
