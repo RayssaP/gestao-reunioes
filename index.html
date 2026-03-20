@@ -720,6 +720,40 @@
   </div>
 </div>
 
+<!-- EDIT ACTION MODAL -->
+<div class="modal-overlay hidden" id="modal-edit-action">
+  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Encaminhamento</div>
+      <button class="modal-close" id="btn-edit-action-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="lbl">Encaminhamento *</label>
+        <textarea class="inp" id="edit-action-text" style="min-height:80px" placeholder="Descreva o encaminhamento..."></textarea>
+      </div>
+      <div class="grid2">
+        <div>
+          <label class="lbl">Responsável</label>
+          <input class="inp" id="edit-action-resp" placeholder="Nome do responsável"/>
+        </div>
+        <div>
+          <label class="lbl">Prazo</label>
+          <input class="inp" type="date" id="edit-action-deadline"/>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="edit-action-done" style="width:16px;height:16px;accent-color:#22C55E"/>
+        <label for="edit-action-done" style="font-size:14px;color:var(--text2);cursor:pointer">Marcar como concluído</label>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="btn-edit-action-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-edit-action-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay hidden" id="modal-delete">
   <div class="modal">
@@ -1311,10 +1345,17 @@ function renderDetail(m) {
                 <div class="item-title" style="${a.done?'text-decoration:line-through;color:var(--text3)':''}">${escHtml(a.text)}</div>
                 <div class="item-meta">
                   ${a.responsible?`<span>👤 ${escHtml(a.responsible)}</span>`:''}
-                  ${a.deadline?`<span>📅 Prazo: ${fmtDate(a.deadline)}</span>`:''}
+                  ${(() => {
+                    const hoje = new Date(); hoje.setHours(0,0,0,0);
+                    const vencido = a.deadline && new Date(a.deadline+'T00:00:00') < hoje && !a.done;
+                    return a.deadline
+                      ? `<span style="color:${vencido?'#EF4444':'#F59E0B'}">📅 ${vencido?'Vencido: ':'Prazo: '}${fmtDate(a.deadline)}</span>`
+                      : `<span style="color:var(--text3)">📅 Sem prazo</span>`;
+                  })()}
                   <span class="${a.done?'item-status-done':'item-status-pending'}">${a.done?'Concluído':'Pendente'}</span>
                 </div>
               </div>
+              <button class="btn btn-ghost btn-sm action-edit-btn" data-action-idx="${i}" style="flex-shrink:0;font-size:13px" title="Editar encaminhamento">✏️</button>
             </div>`).join('')}
       </div>
     </div>
@@ -1390,10 +1431,47 @@ function renderDetail(m) {
       localStorage.setItem('reunioes-data', JSON.stringify(meetings));
       if (odTokenData) odSaveMeeting(meeting);
       renderSidebar();
-      renderDetail(meeting); // re-render in place
+      renderDetail(meeting);
+    });
+  });
+
+  // Editar encaminhamento
+  document.querySelectorAll('.action-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.actionIdx);
+      const meeting = meetings.find(x => x.id === m.id);
+      if (!meeting) return;
+      const a = meeting.actions[idx];
+      document.getElementById('edit-action-text').value     = a.text || '';
+      document.getElementById('edit-action-resp').value     = a.responsible || '';
+      document.getElementById('edit-action-deadline').value = a.deadline || '';
+      document.getElementById('edit-action-done').checked   = !!a.done;
+      document.getElementById('modal-edit-action').classList.remove('hidden');
+
+      document.getElementById('btn-edit-action-save').onclick = () => {
+        const text = document.getElementById('edit-action-text').value.trim();
+        if (!text) { showToast('Preencha o encaminhamento.', 'info'); return; }
+        meeting.actions[idx] = {
+          ...meeting.actions[idx],
+          text,
+          responsible: document.getElementById('edit-action-resp').value.trim(),
+          deadline:    document.getElementById('edit-action-deadline').value,
+          done:        document.getElementById('edit-action-done').checked
+        };
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
+        document.getElementById('modal-edit-action').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('✅ Encaminhamento atualizado!');
+      };
     });
   });
 }
+
+// Fechar modal de edição de encaminhamento
+document.getElementById('btn-edit-action-close').onclick  = () => document.getElementById('modal-edit-action').classList.add('hidden');
+document.getElementById('btn-edit-action-cancel').onclick = () => document.getElementById('modal-edit-action').classList.add('hidden');
 
 function confirmDelete(m) {
   deleteTarget = m.id;
