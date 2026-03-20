@@ -720,6 +720,42 @@
   </div>
 </div>
 
+<!-- EDIT PARTICIPANT MODAL -->
+<div class="modal-overlay hidden" id="modal-edit-participant">
+  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Participante</div>
+      <button class="modal-close" id="btn-edit-participant-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="lbl">Nome *</label>
+        <input class="inp" id="edit-p-name" placeholder="Nome completo"/>
+      </div>
+      <div>
+        <label class="lbl">Órgão / Instituição</label>
+        <input class="inp" id="edit-p-org" placeholder="Ex: Secretaria de Saúde"/>
+      </div>
+      <div class="grid2">
+        <div>
+          <label class="lbl">E-mail</label>
+          <input class="inp" id="edit-p-email" type="email" placeholder="email@exemplo.com"/>
+        </div>
+        <div>
+          <label class="lbl">Telefone</label>
+          <input class="inp" id="edit-p-phone" placeholder="(00) 00000-0000"/>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-danger btn-sm" id="btn-edit-participant-delete">🗑️ Remover</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost" id="btn-edit-participant-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-edit-participant-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT ACTION MODAL -->
 <div class="modal-overlay hidden" id="modal-edit-action">
   <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
@@ -1364,8 +1400,10 @@ function renderDetail(m) {
       <div class="section-head">👥 Participantes</div>
       <div class="section-body">
         ${participants.length===0?'<div class="section-empty">Nenhum participante registrado</div>':
-          `<div class="grid2auto">${participants.map(p=>`
-            <div class="participant-card">
+          `<div class="grid2auto">${participants.map((p,i)=>`
+            <div class="participant-card" style="position:relative">
+              <button class="participant-edit-btn btn btn-ghost btn-sm" data-p-idx="${i}"
+                style="position:absolute;top:8px;right:8px;padding:3px 7px;font-size:12px" title="Editar participante">✏️</button>
               <div class="participant-name">${escHtml(p.name)}</div>
               ${p.org?`<div class="participant-org">${escHtml(p.org)}</div>`:''}
               <div class="participant-contact">
@@ -1435,7 +1473,49 @@ function renderDetail(m) {
     });
   });
 
-  // Editar encaminhamento
+  // Editar participante
+  document.querySelectorAll('.participant-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.pIdx);
+      const meeting = meetings.find(x => x.id === m.id);
+      if (!meeting) return;
+      const p = meeting.participants[idx];
+      document.getElementById('edit-p-name').value  = p.name  || '';
+      document.getElementById('edit-p-org').value   = p.org   || '';
+      document.getElementById('edit-p-email').value = p.email || '';
+      document.getElementById('edit-p-phone').value = p.phone || '';
+      document.getElementById('modal-edit-participant').classList.remove('hidden');
+
+      document.getElementById('btn-edit-participant-save').onclick = () => {
+        const name = document.getElementById('edit-p-name').value.trim();
+        if (!name) { showToast('Preencha o nome do participante.', 'info'); return; }
+        meeting.participants[idx] = {
+          ...meeting.participants[idx],
+          name,
+          org:   document.getElementById('edit-p-org').value.trim(),
+          email: document.getElementById('edit-p-email').value.trim(),
+          phone: document.getElementById('edit-p-phone').value.trim()
+        };
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
+        document.getElementById('modal-edit-participant').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('✅ Participante atualizado!');
+      };
+
+      document.getElementById('btn-edit-participant-delete').onclick = () => {
+        if (!confirm(`Remover "${p.name}" da reunião?`)) return;
+        meeting.participants.splice(idx, 1);
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
+        document.getElementById('modal-edit-participant').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('Participante removido.', 'info');
+      };
+    });
+  });
   document.querySelectorAll('.action-edit-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.actionIdx);
@@ -1472,6 +1552,10 @@ function renderDetail(m) {
 // Fechar modal de edição de encaminhamento
 document.getElementById('btn-edit-action-close').onclick  = () => document.getElementById('modal-edit-action').classList.add('hidden');
 document.getElementById('btn-edit-action-cancel').onclick = () => document.getElementById('modal-edit-action').classList.add('hidden');
+
+// Fechar modal de edição de participante
+document.getElementById('btn-edit-participant-close').onclick  = () => document.getElementById('modal-edit-participant').classList.add('hidden');
+document.getElementById('btn-edit-participant-cancel').onclick = () => document.getElementById('modal-edit-participant').classList.add('hidden');
 
 function confirmDelete(m) {
   deleteTarget = m.id;
