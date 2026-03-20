@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gestão de Reuniões</title>
+<title>Gestão SUBGD</title>
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -617,7 +617,7 @@
     </button>
     <div class="logo">📋</div>
     <div>
-      <div class="header-title">Gestão de Reuniões</div>
+      <div class="header-title">Gestão SUBGD</div>
       <div class="header-sub" id="meeting-count">0 REGISTROS</div>
     </div>
   </div>
@@ -725,7 +725,7 @@
           </div>
           <div style="font-size:11px;color:var(--text3);padding:8px 10px;background:var(--bg);border-radius:6px;font-family:var(--font-mono);margin-top:8px;line-height:1.6">
             📁 Cada reunião é salva como arquivo separado em:<br>
-            <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
+            <span style="color:#93c5fd">Google Drive/GestaoSUBGD/subgd.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar agora</button>
@@ -930,8 +930,8 @@
 
 <script>
 // ===== STATE =====
-let meetings = JSON.parse(localStorage.getItem('reunioes-data') || '[]');
-let settings = JSON.parse(localStorage.getItem('reunioes-settings') || '{}');
+let meetings = JSON.parse(localStorage.getItem('gestao-subgd-data') || '[]');
+let settings = JSON.parse(localStorage.getItem('gestao-subgd-settings') || '{}');
 let selectedId = null;
 let currentView = 'empty';
 let filterStatus = 'Todas';
@@ -942,10 +942,10 @@ let deleteTarget = null;
 
 // ===== GOOGLE DRIVE — GOOGLE IDENTITY SERVICES + DRIVE API =====
 // Requer hospedagem em https:// com Client ID OAuth de Aplicativo da Web.
-// Os dados são salvos em Google Drive/GestaoReunioes/reunioes.json
+// Os dados são salvos em Google Drive/GestaoSUBGD/subgd.json
 
-const GD_FOLDER = 'GestaoReunioes';
-const GD_FILENAME = 'reunioes.json';
+const GD_FOLDER = 'GestaoSUBGD';
+const GD_FILENAME = 'subgd.json';
 const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -1162,7 +1162,7 @@ async function odLoadAll() {
     if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
     const data = await r.json();
     meetings = Array.isArray(data) ? data : (data.meetings || []);
-    localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+    localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings));
     renderSidebar();
     renderDashboard();
     settings.odLastSync = new Date().toISOString();
@@ -1271,8 +1271,8 @@ function updateOdUI() {
 }
 
 // ── Override save ──
-function save() { localStorage.setItem('reunioes-data', JSON.stringify(meetings)); }
-function saveSettings() { localStorage.setItem('reunioes-settings', JSON.stringify(settings)); }
+function save() { localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings)); }
+function saveSettings() { localStorage.setItem('gestao-subgd-settings', JSON.stringify(settings)); }
 
 // ===== TEMA (claro / escuro / sistema) =====
 function applyTheme(theme) {
@@ -1331,6 +1331,19 @@ function initAutoSyncUI() {
     updateSliderUI(toggle.checked);
     startAutoSync();
   };
+
+  // Fallback direto no label para garantir funcionamento em todos os navegadores
+  const lbl = toggle.closest('label');
+  if (lbl) {
+    lbl.onclick = (e) => {
+      e.preventDefault();
+      toggle.checked = !toggle.checked;
+      settings.autoSync = toggle.checked;
+      saveSettings();
+      updateSliderUI(toggle.checked);
+      startAutoSync();
+    };
+  }
   sel.onchange = () => {
     settings.autoSyncInterval = parseInt(sel.value);
     saveSettings();
@@ -1457,7 +1470,7 @@ function renderDetail(m) {
     <div class="print-header">
       <div class="print-logo">
         <div class="print-logo-icon">📋</div>
-        <div><div style="font-weight:700;color:#1E293B;font-size:14px">Gestão de Reuniões</div><div style="font-size:11px;color:#94A3B8">Documento gerado em ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+        <div><div style="font-weight:700;color:#1E293B;font-size:14px">Gestão SUBGD</div><div style="font-size:11px;color:#94A3B8">Documento gerado em ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
       </div>
       <div style="text-align:right;font-size:12px;color:#94A3B8">
         ${fmtDate(m.date)} ${m.date?new Date(m.date+'T'+(m.time||'00:00')).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}
@@ -1576,7 +1589,7 @@ function renderDetail(m) {
       </div>
     </div>
     <div class="print-footer">
-      Gestão de Reuniões · Documento gerado em ${new Date().toLocaleString('pt-BR')} · Confidencial
+      Gestão SUBGD · Documento gerado em ${new Date().toLocaleString('pt-BR')} · Confidencial
     </div>
   `;
 
@@ -1601,7 +1614,7 @@ function renderDetail(m) {
       const meeting = meetings.find(x => x.id === m.id);
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings));
       if (odTokenData) odSaveMeeting(meeting);
       renderSidebar();
       renderDetail(meeting);
@@ -1631,7 +1644,7 @@ function renderDetail(m) {
           email: document.getElementById('edit-p-email').value.trim(),
           phone: document.getElementById('edit-p-phone').value.trim()
         };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings));
         if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
@@ -1642,7 +1655,7 @@ function renderDetail(m) {
       document.getElementById('btn-edit-participant-delete').onclick = () => {
         if (!confirm(`Remover "${p.name}" da reunião?`)) return;
         meeting.participants.splice(idx, 1);
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings));
         if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
@@ -1673,7 +1686,7 @@ function renderDetail(m) {
           deadline:    document.getElementById('edit-action-deadline').value,
           done:        document.getElementById('edit-action-done').checked
         };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        localStorage.setItem('gestao-subgd-data', JSON.stringify(meetings));
         if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-action').classList.add('hidden');
         renderSidebar();
@@ -2740,7 +2753,8 @@ startAutoSync();
 
 function updateProviderUI() {}
 
-// Inicializa UI quando settings for aberto
+// Inicializa UI do auto-sync na carga e quando settings for aberto
+initAutoSyncUI();
 document.getElementById('btn-settings').addEventListener('click', () => {
   initAutoSyncUI();
   applyTheme(settings.theme || 'light');
