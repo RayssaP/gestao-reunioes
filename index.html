@@ -559,6 +559,7 @@
   .section-empty { color: #94A3B8 !important; font-style: italic !important; font-size: 13px !important; }
 
   .grid2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 16px !important; }
+  .grid-pauta { grid-template-columns: 1fr !important; gap: 12px !important; }
   .grid2auto { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; gap: 10px !important; }
 
   .item-card {
@@ -1480,7 +1481,7 @@ function renderDetail(m) {
       </div>
     </div>
 
-    <div class="grid2" style="margin-bottom:20px">
+    <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
         <div class="section-body">${m.agenda?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
