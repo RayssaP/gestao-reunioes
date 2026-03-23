@@ -1059,26 +1059,6 @@ async function gdFindDataFile(folderId) {
   return id;
 }
 
-function isDriveConfigured() {
-  return !!(settings.odClientId || odTokenData?.access_token);
-}
-
-async function gdFetchMeetingsFromDrive() {
-  const folderId = await ensureFolder();
-  const fileId = await gdFindDataFile(folderId);
-  if (!fileId) return [];
-  const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
-  if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
-  const data = await r.json();
-  return Array.isArray(data) ? data : (data.meetings || []);
-}
-
-let driveSyncQueue = Promise.resolve();
-function enqueueDriveSync(task) {
-  driveSyncQueue = driveSyncQueue.then(task, task);
-  return driveSyncQueue;
-}
-
 async function uploadDriveJson(fileId, folderId, payloadObj) {
   const metadata = fileId
     ? { name: GD_FILENAME }
@@ -1131,63 +1111,26 @@ async function odSaveIndex() {
 }
 
 async function odSaveMeeting(meeting) {
-  if (!meeting || !isDriveConfigured()) return;
-  return enqueueDriveSync(async () => {
-    setOdStatus('syncing', 'Salvando…');
-    try {
-      await ensureGoogleAccess(false);
-      let remoteMeetings = [];
-      try {
-        remoteMeetings = await gdFetchMeetingsFromDrive();
-      } catch (_) {}
-      const idx = remoteMeetings.findIndex(m => m.id === meeting.id);
-      if (idx >= 0) remoteMeetings[idx] = meeting;
-      else remoteMeetings.unshift(meeting);
-      meetings = remoteMeetings;
-      save();
-      await odSaveIndex();
-      settings.odLastSync = new Date().toISOString();
-      saveSettings();
-      setOdStatus('on', 'Drive ✓');
-      updateLastSync();
-      renderSidebar();
-      renderDashboard();
-      if (selectedId) {
-        const selected = meetings.find(m => m.id === selectedId);
-        if (selected && document.getElementById('view-detail').style.display !== 'none') renderDetail(selected);
-      }
-    } catch (e) {
-      setOdStatus('err', 'Erro');
-      showToast('Erro Google Drive: ' + e.message, 'info');
-    }
-  });
+  if (!meeting) return;
+  setOdStatus('syncing', 'Salvando…');
+  try {
+    const idx = meetings.findIndex(m => m.id === meeting.id);
+    if (idx >= 0) meetings[idx] = meeting;
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch (e) {
+    setOdStatus('err', 'Erro');
+    showToast('Erro Google Drive: ' + e.message, 'info');
+  }
 }
 
 async function odDeleteMeeting(id) {
-  if (!id || !isDriveConfigured()) return;
-  return enqueueDriveSync(async () => {
-    setOdStatus('syncing', 'Excluindo…');
-    try {
-      await ensureGoogleAccess(false);
-      let remoteMeetings = [];
-      try {
-        remoteMeetings = await gdFetchMeetingsFromDrive();
-      } catch (_) {}
-      remoteMeetings = remoteMeetings.filter(m => m.id !== id);
-      meetings = remoteMeetings;
-      save();
-      await odSaveIndex();
-      settings.odLastSync = new Date().toISOString();
-      saveSettings();
-      setOdStatus('on', 'Drive ✓');
-      updateLastSync();
-      renderSidebar();
-      renderDashboard();
-    } catch(e) {
-      setOdStatus('err', 'Erro');
-      showToast('Erro Google Drive: ' + e.message, 'info');
-    }
-  });
+  try {
+    await odSaveIndex();
+  } catch(e) {}
 }
 
 async function odSyncAll() {
@@ -1205,32 +1148,31 @@ async function odSyncAll() {
   }
 }
 
-async function odLoadAll(silent = false) {
-  if (!isDriveConfigured()) return;
-  return enqueueDriveSync(async () => {
-    setOdStatus('syncing', 'Baixando…');
-    try {
-      await ensureGoogleAccess(false);
-      const remoteMeetings = await gdFetchMeetingsFromDrive();
-      meetings = remoteMeetings;
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-      renderSidebar();
-      renderDashboard();
-      if (selectedId) {
-        const selected = meetings.find(m => m.id === selectedId);
-        if (selected && document.getElementById('view-detail').style.display !== 'none') renderDetail(selected);
-        if (!selected) showView('empty');
-      }
-      settings.odLastSync = new Date().toISOString();
-      saveSettings();
-      setOdStatus('on', 'Drive ✓');
-      updateLastSync();
-      if (!silent) showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
-    } catch (e) {
-      setOdStatus('err', 'Erro ao baixar');
-      if (!silent) showToast('Erro: ' + e.message, 'info');
+async function odLoadAll() {
+  setOdStatus('syncing', 'Baixando…');
+  try {
+    const folderId = await ensureFolder();
+    const fileId = await gdFindDataFile(folderId);
+    if (!fileId) {
+      await odSyncAll();
+      return;
     }
-  });
+    const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
+    if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
+    const data = await r.json();
+    meetings = Array.isArray(data) ? data : (data.meetings || []);
+    localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+    renderSidebar();
+    renderDashboard();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+    showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
+  } catch (e) {
+    setOdStatus('err', 'Erro ao baixar');
+    showToast('Erro: ' + e.message, 'info');
+  }
 }
 
 async function odFetchUser() {
@@ -1356,7 +1298,7 @@ let autoSyncTimer = null;
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   if (!settings.autoSync) return;
-  const mins = parseInt(settings.autoSyncInterval || 1);
+  const mins = parseInt(settings.autoSyncInterval || 30);
   autoSyncTimer = setInterval(async () => {
     if (hasValidGoogleToken() || settings.odClientId) {
       try { await odLoadAll(); } catch(e) {}
@@ -1379,7 +1321,7 @@ function initAutoSyncUI() {
   }
 
   toggle.checked = !!settings.autoSync;
-  sel.value = String(settings.autoSyncInterval || 1);
+  sel.value = String(settings.autoSyncInterval || 30);
   updateSliderUI(!!settings.autoSync);
 
   toggle.onchange = () => {
@@ -1387,7 +1329,6 @@ function initAutoSyncUI() {
     saveSettings();
     updateSliderUI(toggle.checked);
     startAutoSync();
-    if (toggle.checked && isDriveConfigured()) odLoadAll(true);
   };
   sel.onchange = () => {
     settings.autoSyncInterval = parseInt(sel.value);
@@ -1397,7 +1338,7 @@ function initAutoSyncUI() {
 }
 
 // ── Auto-sync inicial (usa configuração salva, padrão: ligado, 30 min) ──
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings(); }
+if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
 
 // ── Restore session on page load ──
 async function restoreOdSession() {
@@ -1660,7 +1601,7 @@ function renderDetail(m) {
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
       localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-      if (isDriveConfigured()) odSaveMeeting(meeting);
+      if (odTokenData) odSaveMeeting(meeting);
       renderSidebar();
       renderDetail(meeting);
     });
@@ -1690,7 +1631,7 @@ function renderDetail(m) {
           phone: document.getElementById('edit-p-phone').value.trim()
         };
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (isDriveConfigured()) odSaveMeeting(meeting);
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1701,7 +1642,7 @@ function renderDetail(m) {
         if (!confirm(`Remover "${p.name}" da reunião?`)) return;
         meeting.participants.splice(idx, 1);
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (isDriveConfigured()) odSaveMeeting(meeting);
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1732,7 +1673,7 @@ function renderDetail(m) {
           done:        document.getElementById('edit-action-done').checked
         };
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (isDriveConfigured()) odSaveMeeting(meeting);
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-action').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -2066,7 +2007,7 @@ function saveForm() {
     selectedId = formData.id;
   }
   save();
-  if (isDriveConfigured()) odSaveMeeting(formData);
+  if (odTokenData) odSaveMeeting(formData);
   renderSidebar();
   const m = meetings.find(m=>m.id===selectedId);
   if (m) renderDetail(m);
@@ -2531,10 +2472,6 @@ document.getElementById('btn-onedrive').onclick = () => {
   document.getElementById('modal-settings').classList.remove('hidden');
 };
 
-window.addEventListener('focus', () => { if (settings.autoSync && isDriveConfigured()) odLoadAll(true); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && settings.autoSync && isDriveConfigured()) odLoadAll(true); });
-window.addEventListener('online', () => { if (settings.autoSync && isDriveConfigured()) odLoadAll(true); });
-
 document.getElementById('btn-delete-close').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-cancel').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-confirm').onclick = () => {
@@ -2542,7 +2479,7 @@ document.getElementById('btn-delete-confirm').onclick = () => {
     const idToDelete = deleteTarget;
     meetings = meetings.filter(m=>m.id!==idToDelete);
     save();
-    if (isDriveConfigured()) odDeleteMeeting(idToDelete);
+    if (odTokenData) odDeleteMeeting(idToDelete);
     selectedId=null;
     deleteTarget=null;
     document.getElementById('modal-delete').classList.add('hidden');
