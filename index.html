@@ -1124,10 +1124,18 @@ async function odSaveMeeting(meeting) {
   }
 }
 
-async function odDeleteMeeting(id) {
+async function odDeleteMeeting() {
+  setOdStatus('syncing', 'Salvando…');
   try {
     await odSaveIndex();
-  } catch(e) {}
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch(e) {
+    setOdStatus('err', 'Erro ao salvar');
+    showToast('⚠️ Exclusão salva localmente, mas falhou no Drive. Abra as Configurações e clique em "Sincronizar agora" para tentar novamente.', 'info');
+  }
 }
 
 async function odSyncAll() {
@@ -1357,9 +1365,10 @@ async function restoreOdSession() {
         await ensureGoogleAccess(false);
         await odLoadAll();
       } catch(e2) {
-        // Renovação silenciosa falhou — usuário precisa reconectar manualmente
-        setOdStatus('off', 'Reconectar');
+        // Renovação silenciosa falhou — avisa que dados podem estar desatualizados
+        setOdStatus('err', 'Reconectar');
         updateOdUI();
+        showToast('⚠️ Não foi possível sincronizar com o Drive. Os dados exibidos podem estar desatualizados. Clique em "Reconectar" nas Configurações.', 'info');
       }
     }
   }
@@ -2471,18 +2480,23 @@ document.getElementById('btn-onedrive').onclick = () => {
 
 document.getElementById('btn-delete-close').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-cancel').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
-document.getElementById('btn-delete-confirm').onclick = () => {
+document.getElementById('btn-delete-confirm').onclick = async () => {
   if (deleteTarget) {
     const idToDelete = deleteTarget;
     meetings = meetings.filter(m=>m.id!==idToDelete);
     save();
-    if (odTokenData) odDeleteMeeting(idToDelete);
     selectedId=null;
     deleteTarget=null;
     document.getElementById('modal-delete').classList.add('hidden');
     renderSidebar();
     showView('empty');
     showToast('Reunião removida.', 'info');
+    if (odTokenData || settings.odClientId) {
+      try {
+        await ensureGoogleAccess(false);
+      } catch(e) {}
+      await odDeleteMeeting();
+    }
   }
 };
 
