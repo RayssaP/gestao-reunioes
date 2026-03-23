@@ -487,124 +487,6 @@
 .dash-animate:nth-child(2) { animation-delay: 0.05s; }
 .dash-animate:nth-child(3) { animation-delay: 0.1s; }
 .dash-animate:nth-child(4) { animation-delay: 0.15s; }
-
-/* ===== PRINT / PDF ===== */
-@media print {
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-
-  body, html { overflow: visible !important; height: auto !important; background: #fff !important; }
-  #header, #sidebar, #sidebar-overlay, #toast,
-  .detail-actions, #detail-back,
-  .action-toggle-btn, .action-edit-btn,
-  .participant-edit-btn,
-  .modal-overlay { display: none !important; }
-
-  #app { display: block !important; }
-  #main { display: block !important; overflow: visible !important; }
-  #content { overflow: visible !important; }
-  #view-detail { display: block !important; overflow: visible !important; height: auto !important; }
-  #view-empty, #view-form { display: none !important; }
-
-  #detail-view {
-    padding: 0 !important; max-width: 100% !important;
-    font-family: Georgia, serif !important;
-    color: #1E293B !important;
-  }
-
-  /* Cabeçalho do PDF */
-  .print-header {
-    display: flex !important;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding-bottom: 16px;
-    border-bottom: 3px solid #F59E0B;
-    margin-bottom: 24px;
-  }
-  .print-logo {
-    display: flex !important;
-    align-items: center; gap: 10px;
-    font-size: 13px; color: #64748B;
-  }
-  .print-logo-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #F59E0B, #D97706);
-    border-radius: 8px;
-    display: flex !important;
-    align-items: center; justify-content: center;
-    font-size: 18px; color: #fff;
-  }
-
-  .detail-title { font-size: 22px !important; color: #1E293B !important; margin-bottom: 4px !important; }
-  .detail-location { font-size: 13px !important; color: #64748B !important; }
-  .badge { font-size: 11px !important; padding: 3px 10px !important; }
-
-  .section-card {
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 10px !important;
-    break-inside: avoid;
-    margin-bottom: 16px !important;
-    background: #fff !important;
-  }
-  .section-head {
-    background: #F8FAFC !important;
-    padding: 10px 16px !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-    letter-spacing: .05em !important;
-    text-transform: uppercase !important;
-    border-bottom: 1px solid #E2E8F0 !important;
-  }
-  .section-body { padding: 14px 16px !important; }
-  .section-empty { color: #94A3B8 !important; font-style: italic !important; font-size: 13px !important; }
-
-  .grid2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 16px !important; }
-  .grid2auto { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; gap: 10px !important; }
-
-  .item-card {
-    background: #F8FAFC !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 8px !important;
-    padding: 10px 14px !important;
-    margin-bottom: 8px !important;
-    break-inside: avoid;
-  }
-  .item-title { font-size: 13px !important; color: #1E293B !important; }
-  .item-meta { font-size: 11px !important; color: #64748B !important; margin-top: 4px !important; display: flex; gap: 12px; flex-wrap: wrap; }
-  .item-status-pending { color: #F59E0B !important; }
-  .item-status-done    { color: #22C55E !important; }
-
-  .participant-card {
-    background: #F8FAFC !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 8px !important;
-    padding: 10px 12px !important;
-    break-inside: avoid;
-  }
-  .participant-name { font-size: 13px !important; font-weight: 700 !important; color: #1E293B !important; }
-  .participant-org  { font-size: 11px !important; color: #F59E0B !important; }
-  .participant-contact { font-size: 11px !important; color: #475569 !important; margin-top: 4px !important; }
-
-  .doc-item {
-    background: #F8FAFC !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 8px !important;
-    padding: 8px 12px !important;
-    margin-bottom: 6px !important;
-  }
-  .doc-name { font-size: 13px !important; }
-  .doc-desc { font-size: 11px !important; color: #64748B !important; }
-
-  .print-footer {
-    display: block !important;
-    margin-top: 32px;
-    padding-top: 12px;
-    border-top: 1px solid #E2E8F0;
-    font-size: 11px;
-    color: #94A3B8;
-    text-align: center;
-  }
-}
 </style>
 </head>
 <body>
@@ -834,76 +716,6 @@
       <hr style="border:none;border-top:1px solid var(--bg3)"/>
 
       <button class="btn btn-ghost" id="btn-settings-save" style="width:100%;justify-content:center;padding:10px">Fechar</button>
-    </div>
-  </div>
-</div>
-
-<!-- EDIT PARTICIPANT MODAL -->
-<div class="modal-overlay hidden" id="modal-edit-participant">
-  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
-    <div class="modal-header">
-      <div class="modal-title">✏️ Editar Participante</div>
-      <button class="modal-close" id="btn-edit-participant-close">×</button>
-    </div>
-    <div class="modal-body">
-      <div>
-        <label class="lbl">Nome *</label>
-        <input class="inp" id="edit-p-name" placeholder="Nome completo"/>
-      </div>
-      <div>
-        <label class="lbl">Órgão / Instituição</label>
-        <input class="inp" id="edit-p-org" placeholder="Ex: Secretaria de Saúde"/>
-      </div>
-      <div class="grid2">
-        <div>
-          <label class="lbl">E-mail</label>
-          <input class="inp" id="edit-p-email" type="email" placeholder="email@exemplo.com"/>
-        </div>
-        <div>
-          <label class="lbl">Telefone</label>
-          <input class="inp" id="edit-p-phone" placeholder="(00) 00000-0000"/>
-        </div>
-      </div>
-      <div class="modal-btns">
-        <button class="btn btn-danger btn-sm" id="btn-edit-participant-delete">🗑️ Remover</button>
-        <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="btn-edit-participant-cancel">Cancelar</button>
-        <button class="btn btn-primary" id="btn-edit-participant-save">💾 Salvar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- EDIT ACTION MODAL -->
-<div class="modal-overlay hidden" id="modal-edit-action">
-  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
-    <div class="modal-header">
-      <div class="modal-title">✏️ Editar Encaminhamento</div>
-      <button class="modal-close" id="btn-edit-action-close">×</button>
-    </div>
-    <div class="modal-body">
-      <div>
-        <label class="lbl">Encaminhamento *</label>
-        <textarea class="inp" id="edit-action-text" style="min-height:80px" placeholder="Descreva o encaminhamento..."></textarea>
-      </div>
-      <div class="grid2">
-        <div>
-          <label class="lbl">Responsável</label>
-          <input class="inp" id="edit-action-resp" placeholder="Nome do responsável"/>
-        </div>
-        <div>
-          <label class="lbl">Prazo</label>
-          <input class="inp" type="date" id="edit-action-deadline"/>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="edit-action-done" style="width:16px;height:16px;accent-color:#22C55E"/>
-        <label for="edit-action-done" style="font-size:14px;color:var(--text2);cursor:pointer">Marcar como concluído</label>
-      </div>
-      <div class="modal-btns">
-        <button class="btn btn-ghost" id="btn-edit-action-cancel">Cancelar</button>
-        <button class="btn btn-primary" id="btn-edit-action-save">💾 Salvar</button>
-      </div>
     </div>
   </div>
 </div>
@@ -1454,15 +1266,6 @@ function renderDetail(m) {
   const docs = m.documents || [];
 
   document.getElementById('detail-view').innerHTML = `
-    <div class="print-header">
-      <div class="print-logo">
-        <div class="print-logo-icon">📋</div>
-        <div><div style="font-weight:700;color:#1E293B;font-size:14px">Gestão de Reuniões</div><div style="font-size:11px;color:#94A3B8">Documento gerado em ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
-      </div>
-      <div style="text-align:right;font-size:12px;color:#94A3B8">
-        ${fmtDate(m.date)} ${m.date?new Date(m.date+'T'+(m.time||'00:00')).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}
-      </div>
-    </div>
     <div class="detail-header">
       <div>
         <button class="btn btn-ghost btn-sm" id="detail-back" style="margin-bottom:12px;gap:6px;font-size:12px;color:var(--text3)">← Painel</button>
@@ -1474,8 +1277,6 @@ function renderDetail(m) {
         ${m.location?`<div class="detail-location">📍 ${escHtml(m.location)}</div>`:''}
       </div>
       <div class="detail-actions">
-        <button class="btn btn-ghost btn-sm" id="detail-export-csv" title="Exportar contatos em CSV">📊 Contatos</button>
-        <button class="btn btn-ghost btn-sm" id="detail-export-pdf" title="Exportar reunião em PDF">📄 PDF</button>
         <button class="btn btn-ghost" id="detail-edit">✏️ Editar</button>
         <button class="btn btn-ghost" id="detail-delete" style="border-color:#7F1D1D;color:#FCA5A5">🗑️</button>
       </div>
@@ -1510,17 +1311,10 @@ function renderDetail(m) {
                 <div class="item-title" style="${a.done?'text-decoration:line-through;color:var(--text3)':''}">${escHtml(a.text)}</div>
                 <div class="item-meta">
                   ${a.responsible?`<span>👤 ${escHtml(a.responsible)}</span>`:''}
-                  ${(() => {
-                    const hoje = new Date(); hoje.setHours(0,0,0,0);
-                    const vencido = a.deadline && new Date(a.deadline+'T00:00:00') < hoje && !a.done;
-                    return a.deadline
-                      ? `<span style="color:${vencido?'#EF4444':'#F59E0B'}">📅 ${vencido?'Vencido: ':'Prazo: '}${fmtDate(a.deadline)}</span>`
-                      : `<span style="color:var(--text3)">📅 Sem prazo</span>`;
-                  })()}
+                  ${a.deadline?`<span>📅 Prazo: ${fmtDate(a.deadline)}</span>`:''}
                   <span class="${a.done?'item-status-done':'item-status-pending'}">${a.done?'Concluído':'Pendente'}</span>
                 </div>
               </div>
-              <button class="btn btn-ghost btn-sm action-edit-btn" data-action-idx="${i}" style="flex-shrink:0;font-size:13px" title="Editar encaminhamento">✏️</button>
             </div>`).join('')}
       </div>
     </div>
@@ -1529,10 +1323,8 @@ function renderDetail(m) {
       <div class="section-head">👥 Participantes</div>
       <div class="section-body">
         ${participants.length===0?'<div class="section-empty">Nenhum participante registrado</div>':
-          `<div class="grid2auto">${participants.map((p,i)=>`
-            <div class="participant-card" style="position:relative">
-              <button class="participant-edit-btn btn btn-ghost btn-sm" data-p-idx="${i}"
-                style="position:absolute;top:8px;right:8px;padding:3px 7px;font-size:12px" title="Editar participante">✏️</button>
+          `<div class="grid2auto">${participants.map(p=>`
+            <div class="participant-card">
               <div class="participant-name">${escHtml(p.name)}</div>
               ${p.org?`<div class="participant-org">${escHtml(p.org)}</div>`:''}
               <div class="participant-contact">
@@ -1575,9 +1367,6 @@ function renderDetail(m) {
         </div>
       </div>
     </div>
-    <div class="print-footer">
-      Gestão de Reuniões · Documento gerado em ${new Date().toLocaleString('pt-BR')} · Confidencial
-    </div>
   `;
 
   document.getElementById('detail-back').onclick = () => {
@@ -1585,11 +1374,8 @@ function renderDetail(m) {
     renderSidebar();
     showView('empty');
   };
-  document.getElementById('detail-edit').onclick   = () => openForm(m);
+  document.getElementById('detail-edit').onclick = () => openForm(m);
   document.getElementById('detail-delete').onclick = () => confirmDelete(m);
-
-  document.getElementById('detail-export-pdf').onclick = () => exportMeetingPDF(m);
-  document.getElementById('detail-export-csv').onclick = () => exportContactsCSV(m);
   document.querySelectorAll('[data-ref-id]').forEach(el => {
     el.addEventListener('click', () => selectMeeting(el.dataset.refId));
   });
@@ -1604,93 +1390,10 @@ function renderDetail(m) {
       localStorage.setItem('reunioes-data', JSON.stringify(meetings));
       if (odTokenData) odSaveMeeting(meeting);
       renderSidebar();
-      renderDetail(meeting);
-    });
-  });
-
-  // Editar participante
-  document.querySelectorAll('.participant-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.pIdx);
-      const meeting = meetings.find(x => x.id === m.id);
-      if (!meeting) return;
-      const p = meeting.participants[idx];
-      document.getElementById('edit-p-name').value  = p.name  || '';
-      document.getElementById('edit-p-org').value   = p.org   || '';
-      document.getElementById('edit-p-email').value = p.email || '';
-      document.getElementById('edit-p-phone').value = p.phone || '';
-      document.getElementById('modal-edit-participant').classList.remove('hidden');
-
-      document.getElementById('btn-edit-participant-save').onclick = () => {
-        const name = document.getElementById('edit-p-name').value.trim();
-        if (!name) { showToast('Preencha o nome do participante.', 'info'); return; }
-        meeting.participants[idx] = {
-          ...meeting.participants[idx],
-          name,
-          org:   document.getElementById('edit-p-org').value.trim(),
-          email: document.getElementById('edit-p-email').value.trim(),
-          phone: document.getElementById('edit-p-phone').value.trim()
-        };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
-        document.getElementById('modal-edit-participant').classList.add('hidden');
-        renderSidebar();
-        renderDetail(meeting);
-        showToast('✅ Participante atualizado!');
-      };
-
-      document.getElementById('btn-edit-participant-delete').onclick = () => {
-        if (!confirm(`Remover "${p.name}" da reunião?`)) return;
-        meeting.participants.splice(idx, 1);
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
-        document.getElementById('modal-edit-participant').classList.add('hidden');
-        renderSidebar();
-        renderDetail(meeting);
-        showToast('Participante removido.', 'info');
-      };
-    });
-  });
-  document.querySelectorAll('.action-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.actionIdx);
-      const meeting = meetings.find(x => x.id === m.id);
-      if (!meeting) return;
-      const a = meeting.actions[idx];
-      document.getElementById('edit-action-text').value     = a.text || '';
-      document.getElementById('edit-action-resp').value     = a.responsible || '';
-      document.getElementById('edit-action-deadline').value = a.deadline || '';
-      document.getElementById('edit-action-done').checked   = !!a.done;
-      document.getElementById('modal-edit-action').classList.remove('hidden');
-
-      document.getElementById('btn-edit-action-save').onclick = () => {
-        const text = document.getElementById('edit-action-text').value.trim();
-        if (!text) { showToast('Preencha o encaminhamento.', 'info'); return; }
-        meeting.actions[idx] = {
-          ...meeting.actions[idx],
-          text,
-          responsible: document.getElementById('edit-action-resp').value.trim(),
-          deadline:    document.getElementById('edit-action-deadline').value,
-          done:        document.getElementById('edit-action-done').checked
-        };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
-        document.getElementById('modal-edit-action').classList.add('hidden');
-        renderSidebar();
-        renderDetail(meeting);
-        showToast('✅ Encaminhamento atualizado!');
-      };
+      renderDetail(meeting); // re-render in place
     });
   });
 }
-
-// Fechar modal de edição de encaminhamento
-document.getElementById('btn-edit-action-close').onclick  = () => document.getElementById('modal-edit-action').classList.add('hidden');
-document.getElementById('btn-edit-action-cancel').onclick = () => document.getElementById('modal-edit-action').classList.add('hidden');
-
-// Fechar modal de edição de participante
-document.getElementById('btn-edit-participant-close').onclick  = () => document.getElementById('modal-edit-participant').classList.add('hidden');
-document.getElementById('btn-edit-participant-cancel').onclick = () => document.getElementById('modal-edit-participant').classList.add('hidden');
 
 function confirmDelete(m) {
   deleteTarget = m.id;
@@ -2298,46 +2001,6 @@ function noKeyMessage(err) {
     return '⚙️ Configure sua chave da <strong>Anthropic</strong> nas Configurações para usar o assistente.';
   const msg = err.message.includes('fetch') ? 'Não foi possível conectar. Verifique sua conexão e a chave configurada.' : err.message;
   return '❌ Erro: ' + msg;
-}
-
-// ===== EXPORTAÇÕES =====
-
-function exportMeetingPDF(m) {
-  // Guarda título original
-  const origTitle = document.title;
-  document.title = (m.title || 'Reunião') + ' — ' + fmtDate(m.date);
-  window.print();
-  document.title = origTitle;
-}
-
-function exportContactsCSV(m) {
-  const participants = m.participants || [];
-  if (participants.length === 0) {
-    showToast('Nenhum participante para exportar.', 'info');
-    return;
-  }
-  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reunião', 'Data'];
-  const rows = participants.map(p => [
-    p.name  || '',
-    p.org   || '',
-    p.email || '',
-    p.phone || '',
-    m.title || '',
-    fmtDate(m.date)
-  ]);
-  const csvContent = [header, ...rows]
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-    .join('\n');
-
-  // BOM para abrir corretamente no Excel com acentos
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `contatos_${(m.title||'reuniao').replace(/\s+/g,'_')}_${m.date||'sem_data'}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast(`📊 ${participants.length} contato(s) exportados!`);
 }
 
 // ===== BUSCA IA =====
