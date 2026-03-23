@@ -490,114 +490,117 @@
 
 /* ===== PRINT / PDF ===== */
 @media print {
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-  body, html { overflow: visible !important; height: auto !important; background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  body, html { overflow: visible !important; height: auto !important; background: #fff !important; }
   #header, #sidebar, #sidebar-overlay, #toast,
   .detail-actions, #detail-back,
   .action-toggle-btn, .action-edit-btn,
   .participant-edit-btn,
   .modal-overlay { display: none !important; }
 
-  #app, #main, #content { display: block !important; overflow: visible !important; height: auto !important; width: 100% !important; }
+  #app { display: block !important; }
+  #main { display: block !important; overflow: visible !important; }
+  #content { overflow: visible !important; }
   #view-detail { display: block !important; overflow: visible !important; height: auto !important; }
   #view-empty, #view-form { display: none !important; }
 
   #detail-view {
-    padding: 0 !important;
-    max-width: 100% !important;
+    padding: 0 !important; max-width: 100% !important;
     font-family: Georgia, serif !important;
     color: #1E293B !important;
-    width: 100% !important;
   }
 
-  /* Cabeçalho */
+  /* Cabeçalho do PDF */
   .print-header {
     display: flex !important;
     justify-content: space-between;
-    align-items: center;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #F59E0B;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    padding-bottom: 16px;
+    border-bottom: 3px solid #F59E0B;
+    margin-bottom: 24px;
   }
-  .print-logo { display: flex !important; align-items: center; gap: 7px; font-size: 11px; color: #64748B; }
+  .print-logo {
+    display: flex !important;
+    align-items: center; gap: 10px;
+    font-size: 13px; color: #64748B;
+  }
   .print-logo-icon {
-    width: 26px; height: 26px;
+    width: 36px; height: 36px;
     background: linear-gradient(135deg, #F59E0B, #D97706);
-    border-radius: 5px;
-    display: flex !important; align-items: center; justify-content: center;
-    font-size: 13px;
+    border-radius: 8px;
+    display: flex !important;
+    align-items: center; justify-content: center;
+    font-size: 18px; color: #fff;
   }
 
-  .detail-header { margin-bottom: 8px !important; }
-  .detail-title { font-size: 18px !important; color: #1E293B !important; margin: 4px 0 2px !important; line-height: 1.2 !important; }
-  .detail-location { font-size: 11px !important; color: #64748B !important; margin: 2px 0 !important; }
-  .badge { font-size: 10px !important; padding: 2px 7px !important; }
+  .detail-title { font-size: 22px !important; color: #1E293B !important; margin-bottom: 4px !important; }
+  .detail-location { font-size: 13px !important; color: #64748B !important; }
+  .badge { font-size: 11px !important; padding: 3px 10px !important; }
 
-  /* Seções — SEM break-inside para não criar espaço em branco */
   .section-card {
     border: 1px solid #E2E8F0 !important;
-    border-radius: 6px !important;
-    margin-bottom: 6px !important;
+    border-radius: 10px !important;
+    break-inside: avoid;
+    margin-bottom: 16px !important;
     background: #fff !important;
-    page-break-inside: auto !important;
-    break-inside: auto !important;
   }
   .section-head {
-    background: #F1F5F9 !important;
-    padding: 5px 10px !important;
-    font-size: 9px !important;
+    background: #F8FAFC !important;
+    padding: 10px 16px !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     color: #475569 !important;
-    letter-spacing: .06em !important;
+    letter-spacing: .05em !important;
     text-transform: uppercase !important;
     border-bottom: 1px solid #E2E8F0 !important;
   }
-  .section-body { padding: 8px 10px !important; font-size: 13px !important; line-height: 1.6 !important; }
-  .section-empty { color: #94A3B8 !important; font-style: italic !important; font-size: 12px !important; }
+  .section-body { padding: 14px 16px !important; }
+  .section-empty { color: #94A3B8 !important; font-style: italic !important; font-size: 13px !important; }
 
-  /* Grids */
-  .grid2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px !important; margin-bottom: 6px !important; }
-  .grid-pauta { grid-template-columns: 1fr !important; gap: 4px !important; margin-bottom: 6px !important; }
-  .grid2auto { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important; gap: 6px !important; }
+  .grid2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 16px !important; }
+  .grid2auto { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; gap: 10px !important; }
 
-  /* Encaminhamentos */
   .item-card {
     background: #F8FAFC !important;
     border: 1px solid #E2E8F0 !important;
-    border-radius: 6px !important;
-    padding: 7px 10px !important;
-    margin-bottom: 5px !important;
-    page-break-inside: avoid;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    margin-bottom: 8px !important;
+    break-inside: avoid;
   }
-  .item-title { font-size: 12px !important; color: #1E293B !important; }
-  .item-meta { font-size: 10px !important; color: #64748B !important; margin-top: 3px !important; display: flex; gap: 10px; flex-wrap: wrap; }
+  .item-title { font-size: 13px !important; color: #1E293B !important; }
+  .item-meta { font-size: 11px !important; color: #64748B !important; margin-top: 4px !important; display: flex; gap: 12px; flex-wrap: wrap; }
   .item-status-pending { color: #F59E0B !important; }
   .item-status-done    { color: #22C55E !important; }
 
-  /* Participantes */
   .participant-card {
     background: #F8FAFC !important;
     border: 1px solid #E2E8F0 !important;
-    border-radius: 6px !important;
-    padding: 7px 10px !important;
-    page-break-inside: avoid;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    break-inside: avoid;
   }
-  .participant-name { font-size: 12px !important; font-weight: 700 !important; color: #1E293B !important; }
-  .participant-org  { font-size: 10px !important; color: #F59E0B !important; }
-  .participant-contact { font-size: 10px !important; color: #475569 !important; margin-top: 3px !important; }
+  .participant-name { font-size: 13px !important; font-weight: 700 !important; color: #1E293B !important; }
+  .participant-org  { font-size: 11px !important; color: #F59E0B !important; }
+  .participant-contact { font-size: 11px !important; color: #475569 !important; margin-top: 4px !important; }
 
-  /* Documentos */
-  .doc-item { background: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-radius: 6px !important; padding: 6px 10px !important; margin-bottom: 4px !important; }
-  .doc-name { font-size: 12px !important; }
-  .doc-desc { font-size: 10px !important; color: #64748B !important; }
+  .doc-item {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 6px !important;
+  }
+  .doc-name { font-size: 13px !important; }
+  .doc-desc { font-size: 11px !important; color: #64748B !important; }
 
   .print-footer {
     display: block !important;
-    margin-top: 16px;
-    padding-top: 8px;
+    margin-top: 32px;
+    padding-top: 12px;
     border-top: 1px solid #E2E8F0;
-    font-size: 10px;
+    font-size: 11px;
     color: #94A3B8;
     text-align: center;
   }
@@ -724,13 +727,9 @@
             <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">⬇️ Buscar do Drive</button>
-            <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
+            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar agora</button>
+            <button class="btn btn-ghost btn-sm" id="btn-od-import" style="flex:1;justify-content:center;min-width:110px">⬇️ Carregar do Drive</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
-          </div>
-          <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
-            ⬇️ <strong>Buscar do Drive</strong> — substitui os dados locais pelos do Drive<br>
-            ⬆️ <strong>Enviar ao Drive</strong> — substitui os dados do Drive pelos locais
           </div>
         </div>
 
@@ -819,10 +818,10 @@
         <div id="autosync-interval-row" style="margin-top:8px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3)">
           <span style="font-size:13px;color:var(--text2)">Intervalo:</span>
           <select class="inp" id="autosync-interval" style="flex:1;padding:7px 10px;font-size:13px">
-            <option value="1">A cada 1 minuto</option>
+            <option value="1" selected>A cada 1 minuto</option>
             <option value="5">A cada 5 minutos</option>
             <option value="10">A cada 10 minutos</option>
-            <option value="30" selected>A cada 30 minutos</option>
+            <option value="30">A cada 30 minutos</option>
           </select>
         </div>
       </div>
@@ -1128,18 +1127,10 @@ async function odSaveMeeting(meeting) {
   }
 }
 
-async function odDeleteMeeting() {
-  setOdStatus('syncing', 'Salvando…');
+async function odDeleteMeeting(id) {
   try {
     await odSaveIndex();
-    settings.odLastSync = new Date().toISOString();
-    saveSettings();
-    setOdStatus('on', 'Drive ✓');
-    updateLastSync();
-  } catch(e) {
-    setOdStatus('err', 'Erro ao salvar');
-    showToast('⚠️ Exclusão salva localmente, mas falhou no Drive. Abra as Configurações e clique em "Sincronizar agora" para tentar novamente.', 'info');
-  }
+  } catch(e) {}
 }
 
 async function odSyncAll() {
@@ -1304,14 +1295,26 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // ===== AUTO-SYNC CONFIGURÁVEL =====
 let autoSyncTimer = null;
+let lastDriveRefreshAt = 0;
+
+async function triggerDriveRefresh(reason = 'auto', force = false) {
+  if (!settings.autoSync) return;
+  if (!(hasValidGoogleToken() || settings.odClientId)) return;
+  if (document.hidden && !force) return;
+
+  const now = Date.now();
+  if (!force && (now - lastDriveRefreshAt) < 15000) return;
+  lastDriveRefreshAt = now;
+
+  try { await odLoadAll(); } catch(e) {}
+}
+
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   if (!settings.autoSync) return;
-  const mins = parseInt(settings.autoSyncInterval || 30);
-  autoSyncTimer = setInterval(async () => {
-    if (hasValidGoogleToken() || settings.odClientId) {
-      try { await odLoadAll(); } catch(e) {}
-    }
+  const mins = parseInt(settings.autoSyncInterval || 1);
+  autoSyncTimer = setInterval(() => {
+    triggerDriveRefresh('interval');
   }, mins * 60 * 1000);
 }
 function initAutoSyncUI() {
@@ -1330,7 +1333,7 @@ function initAutoSyncUI() {
   }
 
   toggle.checked = !!settings.autoSync;
-  sel.value = String(settings.autoSyncInterval || 30);
+  sel.value = String(settings.autoSyncInterval || 1);
   updateSliderUI(!!settings.autoSync);
 
   toggle.onchange = () => {
@@ -1338,6 +1341,7 @@ function initAutoSyncUI() {
     saveSettings();
     updateSliderUI(toggle.checked);
     startAutoSync();
+    if (toggle.checked) triggerDriveRefresh('toggle-on', true);
   };
   sel.onchange = () => {
     settings.autoSyncInterval = parseInt(sel.value);
@@ -1346,8 +1350,8 @@ function initAutoSyncUI() {
   };
 }
 
-// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 30 min) ──
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
+// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 1 min) ──
+if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings(); }
 
 // ── Restore session on page load ──
 async function restoreOdSession() {
@@ -1369,14 +1373,20 @@ async function restoreOdSession() {
         await ensureGoogleAccess(false);
         await odLoadAll();
       } catch(e2) {
-        // Renovação silenciosa falhou — avisa que dados podem estar desatualizados
-        setOdStatus('err', 'Reconectar');
+        // Renovação silenciosa falhou — usuário precisa reconectar manualmente
+        setOdStatus('off', 'Reconectar');
         updateOdUI();
-        showToast('⚠️ Não foi possível sincronizar com o Drive. Os dados exibidos podem estar desatualizados. Clique em "Reconectar" nas Configurações.', 'info');
       }
     }
   }
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) triggerDriveRefresh('visibility', true);
+});
+window.addEventListener('focus', () => triggerDriveRefresh('focus', true));
+window.addEventListener('pageshow', () => triggerDriveRefresh('pageshow', true));
+window.addEventListener('online', () => triggerDriveRefresh('online', true));
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
@@ -1468,8 +1478,8 @@ function renderDetail(m) {
         <div class="print-logo-icon">📋</div>
         <div><div style="font-weight:700;color:#1E293B;font-size:14px">Gestão de Reuniões</div><div style="font-size:11px;color:#94A3B8">Documento gerado em ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
       </div>
-      <div style="text-align:right;font-size:11px;color:#94A3B8">
-        ${fmtDate(m.date)}${m.time ? ' · ' + m.time : ''}
+      <div style="text-align:right;font-size:12px;color:#94A3B8">
+        ${fmtDate(m.date)} ${m.date?new Date(m.date+'T'+(m.time||'00:00')).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}
       </div>
     </div>
     <div class="detail-header">
@@ -1490,7 +1500,7 @@ function renderDetail(m) {
       </div>
     </div>
 
-    <div class="grid2 grid-pauta" style="margin-bottom:20px">
+    <div class="grid2" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
         <div class="section-body">${m.agenda?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
@@ -2475,11 +2485,7 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 document.getElementById('btn-od-connect').onclick    = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
 document.getElementById('btn-od-sync-now').onclick   = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
-document.getElementById('btn-od-upload').onclick     = async () => {
-  if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
-  document.getElementById('modal-settings').classList.add('hidden');
-  await odSyncAll();
-};
+document.getElementById('btn-od-import').onclick     = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
 
 document.getElementById('btn-onedrive').onclick = () => {
   updateOdUI();
@@ -2488,23 +2494,18 @@ document.getElementById('btn-onedrive').onclick = () => {
 
 document.getElementById('btn-delete-close').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-cancel').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
-document.getElementById('btn-delete-confirm').onclick = async () => {
+document.getElementById('btn-delete-confirm').onclick = () => {
   if (deleteTarget) {
     const idToDelete = deleteTarget;
     meetings = meetings.filter(m=>m.id!==idToDelete);
     save();
+    if (odTokenData) odDeleteMeeting(idToDelete);
     selectedId=null;
     deleteTarget=null;
     document.getElementById('modal-delete').classList.add('hidden');
     renderSidebar();
     showView('empty');
     showToast('Reunião removida.', 'info');
-    if (odTokenData || settings.odClientId) {
-      try {
-        await ensureGoogleAccess(false);
-      } catch(e) {}
-      await odDeleteMeeting();
-    }
   }
 };
 
