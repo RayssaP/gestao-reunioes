@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
@@ -724,11 +724,12 @@
             <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:160px">🔄 Sincronizar com o Drive</button>
+            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar com o Drive</button>
+            <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
           </div>
           <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
-            🔄 <strong>Sincronizar com o Drive</strong> — busca, mescla e grava no Drive para refletir inclusões, edições e exclusões em qualquer dispositivo.
+            🔄 <strong>Sincronizar com o Drive</strong> — localiza o JSON mais recente, mesmo que a pasta tenha mudado, atualiza os dados locais e mantém o mesmo arquivo no Drive
           </div>
         </div>
 
@@ -952,10 +953,6 @@ let odTokenData = null;   // mantive os nomes para minimizar mudanças no restan
 let odUserInfo = null;
 let odPollTimer = null;
 let googleTokenClient = null;
-let odSyncQueue = Promise.resolve();
-let syncMeta = JSON.parse(localStorage.getItem('reunioes-sync-meta') || '{"deleted":{}}');
-if (!syncMeta || typeof syncMeta !== 'object') syncMeta = { deleted: {} };
-if (!syncMeta.deleted || typeof syncMeta.deleted !== 'object') syncMeta.deleted = {};
 
 function odSaveTokens(data) {
   odTokenData = data;
@@ -972,95 +969,6 @@ function odClearTokens() {
   delete settings.gdFolderId;
   delete settings.gdFileId;
   saveSettings();
-}
-
-function saveSyncMeta() {
-  localStorage.setItem('reunioes-sync-meta', JSON.stringify(syncMeta));
-}
-function ts(v) {
-  const n = new Date(v || 0).getTime();
-  return Number.isFinite(n) ? n : 0;
-}
-function normalizeMeeting(meeting) {
-  if (!meeting || typeof meeting !== 'object') return null;
-  const m = { ...meeting };
-  if (!m.id) m.id = genId();
-  if (!m.createdAt) m.createdAt = m.updatedAt || new Date().toISOString();
-  if (!m.updatedAt) m.updatedAt = m.createdAt;
-  return m;
-}
-function normalizeDrivePayload(data) {
-  const payload = Array.isArray(data) ? { meetings: data, deleted: {} } : (data || {});
-  const remoteMeetings = Array.isArray(payload.meetings) ? payload.meetings.map(normalizeMeeting).filter(Boolean) : [];
-  const remoteDeleted = payload.deleted && typeof payload.deleted === 'object' ? payload.deleted : {};
-  return { meetings: remoteMeetings, deleted: remoteDeleted };
-}
-function mergeStates(localMeetings, localDeleted, remoteMeetings, remoteDeleted) {
-  const deleted = {};
-  for (const [id, when] of Object.entries(remoteDeleted || {})) {
-    if (!id) continue;
-    deleted[id] = when;
-  }
-  for (const [id, when] of Object.entries(localDeleted || {})) {
-    if (!id) continue;
-    if (!deleted[id] || ts(when) > ts(deleted[id])) deleted[id] = when;
-  }
-
-  const map = new Map();
-  for (const src of [...(remoteMeetings || []), ...(localMeetings || [])]) {
-    const m = normalizeMeeting(src);
-    if (!m) continue;
-    const current = map.get(m.id);
-    if (!current || ts(m.updatedAt) >= ts(current.updatedAt)) {
-      map.set(m.id, m);
-    }
-  }
-
-  for (const [id, deletedAt] of Object.entries(deleted)) {
-    const m = map.get(id);
-    if (m && ts(deletedAt) >= ts(m.updatedAt)) map.delete(id);
-  }
-
-  const mergedMeetings = Array.from(map.values()).sort((a, b) => {
-    const db = ts(b.date || b.updatedAt || b.createdAt);
-    const da = ts(a.date || a.updatedAt || a.createdAt);
-    return db - da;
-  });
-
-  return { meetings: mergedMeetings, deleted };
-}
-function persistStateLocally() {
-  save();
-  saveSyncMeta();
-}
-function refreshCurrentViewAfterSync() {
-  renderSidebar();
-  renderDashboard();
-  if (currentView === 'detail') {
-    const current = meetings.find(m => m.id === selectedId);
-    if (current) renderDetail(current);
-    else {
-      selectedId = null;
-      showView('empty');
-    }
-  }
-}
-function markMeetingUpdated(meeting) {
-  if (!meeting) return meeting;
-  const now = new Date().toISOString();
-  meeting.updatedAt = now;
-  if (!meeting.createdAt) meeting.createdAt = now;
-  if (meeting.id && syncMeta.deleted[meeting.id]) delete syncMeta.deleted[meeting.id];
-  return meeting;
-}
-function markMeetingDeleted(id) {
-  if (!id) return;
-  syncMeta.deleted[id] = new Date().toISOString();
-}
-function queueOd(task) {
-  const next = odSyncQueue.then(task, task);
-  odSyncQueue = next.catch(() => {});
-  return next;
 }
 
 function hasValidGoogleToken() {
@@ -1114,10 +1022,32 @@ async function gfetch(url, opts = {}) {
   return res;
 }
 
+async function gdGetFileById(fileId) {
+  if (!fileId) return null;
+  const r = await gfetch(`${DRIVE_API}/files/${fileId}?fields=id,name,parents,trashed`);
+  if (!r.ok) return null;
+  const data = await r.json();
+  if (!data || data.trashed) return null;
+  return data;
+}
+
+async function gdGetFolderById(folderId) {
+  if (!folderId) return null;
+  const r = await gfetch(`${DRIVE_API}/files/${folderId}?fields=id,name,mimeType,trashed`);
+  if (!r.ok) return null;
+  const data = await r.json();
+  if (!data || data.trashed || data.mimeType !== 'application/vnd.google-apps.folder') return null;
+  return data;
+}
+
 async function gdFindFolder() {
-  if (settings.gdFolderId) return settings.gdFolderId;
+  const cached = await gdGetFolderById(settings.gdFolderId);
+  if (cached) return cached.id;
+  delete settings.gdFolderId;
+  saveSettings();
+
   const q = encodeURIComponent(`name='${GD_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime desc&pageSize=10`);
   if (!r.ok) throw new Error('Falha ao localizar pasta no Drive.');
   const data = await r.json();
   const id = data.files?.[0]?.id || null;
@@ -1140,15 +1070,29 @@ async function ensureFolder() {
   return data.id;
 }
 
-async function gdFindDataFile(folderId) {
-  if (settings.gdFileId) return settings.gdFileId;
-  const q = encodeURIComponent(`name='${GD_FILENAME}' and '${folderId}' in parents and trashed=false`);
-  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
+async function gdFindDataFile() {
+  const cached = await gdGetFileById(settings.gdFileId);
+  if (cached && cached.name === GD_FILENAME) {
+    settings.gdFolderId = cached.parents?.[0] || settings.gdFolderId;
+    saveSettings();
+    return cached.id;
+  }
+  delete settings.gdFileId;
+  saveSettings();
+
+  const q = encodeURIComponent(`name='${GD_FILENAME}' and trashed=false`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,parents,modifiedTime)&orderBy=modifiedTime desc&pageSize=20`);
   if (!r.ok) throw new Error('Falha ao localizar arquivo principal no Drive.');
   const data = await r.json();
-  const id = data.files?.[0]?.id || null;
-  if (id) { settings.gdFileId = id; saveSettings(); }
-  return id;
+  const files = data.files || [];
+  if (!files.length) return null;
+
+  const preferredFolderId = settings.gdFolderId;
+  const chosen = files.find(f => preferredFolderId && Array.isArray(f.parents) && f.parents.includes(preferredFolderId)) || files[0];
+  settings.gdFileId = chosen.id;
+  if (chosen.parents?.[0]) settings.gdFolderId = chosen.parents[0];
+  saveSettings();
+  return chosen.id;
 }
 
 async function uploadDriveJson(fileId, folderId, payloadObj) {
@@ -1192,97 +1136,88 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
   return data.id;
 }
  
-async function odFetchRemotePayload() {
-  const folderId = await ensureFolder();
-  const fileId = await gdFindDataFile(folderId);
-  if (!fileId) return { fileId: null, payload: { meetings: [], deleted: {} }, folderId };
-  const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
-  if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
-  const data = await r.json();
-  return { fileId, payload: normalizeDrivePayload(data), folderId };
-}
-
-async function odSaveIndex(payload = null) {
-  const folderId = await ensureFolder();
-  const fileId = await gdFindDataFile(folderId);
-  const content = payload || { meetings, deleted: syncMeta.deleted };
+async function odSaveIndex() {
+  let fileId = await gdFindDataFile();
+  let folderId = settings.gdFolderId || null;
+  if (!folderId) folderId = await ensureFolder();
   await uploadDriveJson(fileId, folderId, {
-    version: 2,
+    version: 1,
     updatedAt: new Date().toISOString(),
-    meetings: (content.meetings || []).map(normalizeMeeting).filter(Boolean),
-    deleted: content.deleted || {}
-  });
-}
-
-async function odPushLocalToDrive(options = {}) {
-  const { silent = false, forceInteractive = false } = options;
-  return queueOd(async () => {
-    setOdStatus('syncing', 'Sincronizando…');
-    try {
-      await ensureGoogleAccess(forceInteractive);
-      const remote = await odFetchRemotePayload();
-      const merged = mergeStates(meetings, syncMeta.deleted, remote.payload.meetings, remote.payload.deleted);
-      meetings = merged.meetings;
-      syncMeta.deleted = merged.deleted;
-      persistStateLocally();
-      await odSaveIndex({ meetings, deleted: syncMeta.deleted });
-      settings.odLastSync = new Date().toISOString();
-      saveSettings();
-      setOdStatus('on', 'Drive ✓');
-      updateLastSync();
-      refreshCurrentViewAfterSync();
-      if (!silent) showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
-      return true;
-    } catch (e) {
-      setOdStatus('err', 'Erro');
-      if (!silent) showToast('Erro Google Drive: ' + e.message, 'info');
-      throw e;
-    }
+    meetings
   });
 }
 
 async function odSaveMeeting(meeting) {
   if (!meeting) return;
-  const idx = meetings.findIndex(m => m.id === meeting.id);
-  if (idx >= 0) meetings[idx] = markMeetingUpdated(meeting);
-  persistStateLocally();
-  return odPushLocalToDrive({ silent: true });
+  setOdStatus('syncing', 'Salvando…');
+  try {
+    const idx = meetings.findIndex(m => m.id === meeting.id);
+    if (idx >= 0) meetings[idx] = meeting;
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch (e) {
+    setOdStatus('err', 'Erro');
+    showToast('Erro Google Drive: ' + e.message, 'info');
+  }
 }
 
-async function odDeleteMeeting(id) {
-  if (id) markMeetingDeleted(id);
-  persistStateLocally();
-  return odPushLocalToDrive({ silent: true });
+async function odDeleteMeeting() {
+  setOdStatus('syncing', 'Salvando…');
+  try {
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch(e) {
+    setOdStatus('err', 'Erro ao salvar');
+    showToast('⚠️ Exclusão salva localmente, mas falhou no Drive. Abra as Configurações e clique em "Sincronizar agora" para tentar novamente.', 'info');
+  }
 }
 
 async function odSyncAll() {
-  return odPushLocalToDrive({ silent: false, forceInteractive: false });
+  setOdStatus('syncing', 'Sincronizando…');
+  try {
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+    showToast(`☁️ ${meetings.length} reuniões salvas no Google Drive!`);
+  } catch (e) {
+    setOdStatus('err', 'Erro');
+    showToast('Erro: ' + e.message, 'info');
+  }
 }
 
-async function odLoadAll(options = {}) {
-  const { silent = false } = options;
-  return queueOd(async () => {
-    setOdStatus('syncing', 'Sincronizando…');
-    try {
-      await ensureGoogleAccess(false);
-      const remote = await odFetchRemotePayload();
-      const merged = mergeStates(meetings, syncMeta.deleted, remote.payload.meetings, remote.payload.deleted);
-      meetings = merged.meetings;
-      syncMeta.deleted = merged.deleted;
-      persistStateLocally();
-      refreshCurrentViewAfterSync();
-      settings.odLastSync = new Date().toISOString();
-      saveSettings();
-      setOdStatus('on', 'Drive ✓');
-      updateLastSync();
-      if (!silent) showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
-      return true;
-    } catch (e) {
-      setOdStatus('err', 'Erro ao baixar');
-      if (!silent) showToast('Erro: ' + e.message, 'info');
-      throw e;
+async function odLoadAll() {
+  setOdStatus('syncing', 'Baixando…');
+  try {
+    const fileId = await gdFindDataFile();
+    if (!fileId) {
+      const folderId = await ensureFolder();
+      await odSyncAll();
+      return;
     }
-  });
+    const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
+    if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
+    const data = await r.json();
+    meetings = Array.isArray(data) ? data : (data.meetings || []);
+    localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+    renderSidebar();
+    renderDashboard();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+    showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
+  } catch (e) {
+    setOdStatus('err', 'Erro ao baixar');
+    showToast('Erro: ' + e.message, 'info');
+  }
 }
 
 async function odFetchUser() {
@@ -1323,7 +1258,7 @@ async function odConnect() {
     updateOdUI();
     document.getElementById('modal-settings').classList.add('hidden');
     showToast('✅ Google Drive conectado! Carregando reuniões…');
-    await odSyncAll();
+    await odLoadAll();
   } catch (e) {
     codeBox.style.display = 'none';
     setupArea.style.display = 'block';
@@ -1408,10 +1343,10 @@ let autoSyncTimer = null;
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   if (!settings.autoSync) return;
-  const mins = parseInt(settings.autoSyncInterval || 1);
+  const mins = parseInt(settings.autoSyncInterval || 30);
   autoSyncTimer = setInterval(async () => {
     if (hasValidGoogleToken() || settings.odClientId) {
-      try { await odSyncAll(); } catch(e) {}
+      try { await odLoadAll(); } catch(e) {}
     }
   }, mins * 60 * 1000);
 }
@@ -1431,7 +1366,7 @@ function initAutoSyncUI() {
   }
 
   toggle.checked = !!settings.autoSync;
-  sel.value = String(settings.autoSyncInterval || 1);
+  sel.value = String(settings.autoSyncInterval || 30);
   updateSliderUI(!!settings.autoSync);
 
   toggle.onchange = () => {
@@ -1439,19 +1374,16 @@ function initAutoSyncUI() {
     saveSettings();
     updateSliderUI(toggle.checked);
     startAutoSync();
-    if (toggle.checked) odSyncAll().catch(() => {});
   };
   sel.onchange = () => {
     settings.autoSyncInterval = parseInt(sel.value);
     saveSettings();
     startAutoSync();
-    if (settings.autoSync) odSyncAll().catch(() => {});
   };
 }
 
-// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 1 min) ──
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings(); }
-if (!settings.autoSyncInterval || Number(settings.autoSyncInterval) > 5) { settings.autoSyncInterval = 1; saveSettings(); }
+// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 30 min) ──
+if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
 
 // ── Restore session on page load ──
 async function restoreOdSession() {
@@ -1466,12 +1398,12 @@ async function restoreOdSession() {
   if (hasToken || hasClientId) {
     // Tenta carregar do Drive (renovação silenciosa automática se token expirou)
     try {
-      await odSyncAll();
+      await odLoadAll();
     } catch(e) {
       // Falhou — tenta renovação silenciosa forçada
       try {
         await ensureGoogleAccess(false);
-        await odSyncAll();
+        await odLoadAll();
       } catch(e2) {
         // Renovação silenciosa falhou — avisa que dados podem estar desatualizados
         setOdStatus('err', 'Reconectar');
@@ -1714,8 +1646,8 @@ function renderDetail(m) {
       const meeting = meetings.find(x => x.id === m.id);
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
-      persistStateLocally();
-      odSaveMeeting(meeting).catch(() => {});
+      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      if (odTokenData) odSaveMeeting(meeting);
       renderSidebar();
       renderDetail(meeting);
     });
@@ -1744,8 +1676,8 @@ function renderDetail(m) {
           email: document.getElementById('edit-p-email').value.trim(),
           phone: document.getElementById('edit-p-phone').value.trim()
         };
-        persistStateLocally();
-        odSaveMeeting(meeting).catch(() => {});
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1755,8 +1687,8 @@ function renderDetail(m) {
       document.getElementById('btn-edit-participant-delete').onclick = () => {
         if (!confirm(`Remover "${p.name}" da reunião?`)) return;
         meeting.participants.splice(idx, 1);
-        persistStateLocally();
-        odSaveMeeting(meeting).catch(() => {});
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1786,8 +1718,8 @@ function renderDetail(m) {
           deadline:    document.getElementById('edit-action-deadline').value,
           done:        document.getElementById('edit-action-done').checked
         };
-        persistStateLocally();
-        odSaveMeeting(meeting).catch(() => {});
+        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        if (odTokenData) odSaveMeeting(meeting);
         document.getElementById('modal-edit-action').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -2120,9 +2052,8 @@ function saveForm() {
     meetings.unshift(formData);
     selectedId = formData.id;
   }
-  markMeetingUpdated(formData);
-  persistStateLocally();
-  odSaveMeeting(formData).catch(() => {});
+  save();
+  if (odTokenData) odSaveMeeting(formData);
   renderSidebar();
   const m = meetings.find(m=>m.id===selectedId);
   if (m) renderDetail(m);
@@ -2579,7 +2510,12 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 
 document.getElementById('btn-od-connect').onclick    = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
-document.getElementById('btn-od-sync-now').onclick   = async () => { await odSyncAll(); document.getElementById('modal-settings').classList.add('hidden'); };
+document.getElementById('btn-od-sync-now').onclick   = async () => { await odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
+document.getElementById('btn-od-upload').onclick     = async () => {
+  if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
+  document.getElementById('modal-settings').classList.add('hidden');
+  await odSyncAll();
+};
 
 document.getElementById('btn-onedrive').onclick = () => {
   updateOdUI();
@@ -2592,15 +2528,19 @@ document.getElementById('btn-delete-confirm').onclick = async () => {
   if (deleteTarget) {
     const idToDelete = deleteTarget;
     meetings = meetings.filter(m=>m.id!==idToDelete);
-    markMeetingDeleted(idToDelete);
-    persistStateLocally();
+    save();
     selectedId=null;
     deleteTarget=null;
     document.getElementById('modal-delete').classList.add('hidden');
     renderSidebar();
     showView('empty');
     showToast('Reunião removida.', 'info');
-    odDeleteMeeting(idToDelete).catch(() => {});
+    if (odTokenData || settings.odClientId) {
+      try {
+        await ensureGoogleAccess(false);
+      } catch(e) {}
+      await odDeleteMeeting();
+    }
   }
 };
 
