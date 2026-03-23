@@ -724,9 +724,13 @@
             <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar agora</button>
-            <button class="btn btn-ghost btn-sm" id="btn-od-import" style="flex:1;justify-content:center;min-width:110px">⬇️ Carregar do Drive</button>
+            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">⬇️ Buscar do Drive</button>
+            <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
+          </div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
+            ⬇️ <strong>Buscar do Drive</strong> — substitui os dados locais pelos do Drive<br>
+            ⬆️ <strong>Enviar ao Drive</strong> — substitui os dados do Drive pelos locais
           </div>
         </div>
 
@@ -2471,7 +2475,11 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 document.getElementById('btn-od-connect').onclick    = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
 document.getElementById('btn-od-sync-now').onclick   = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
-document.getElementById('btn-od-import').onclick     = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
+document.getElementById('btn-od-upload').onclick     = async () => {
+  if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
+  document.getElementById('modal-settings').classList.add('hidden');
+  await odSyncAll();
+};
 
 document.getElementById('btn-onedrive').onclick = () => {
   updateOdUI();
