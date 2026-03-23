@@ -1340,23 +1340,7 @@ function renderDetail(m) {
         <div class="section-head">📎 Documentos Anexados</div>
         <div class="section-body">
           ${docs.length===0?'<div class="section-empty">Nenhum documento</div>':
-            docs.map(d=>{
-              const hasFile = !!d.data;
-              const hasUrl  = !!d.url;
-              const actionBtn = hasFile
-                ? `<a href="${d.data}" download="${escHtml(d.name)}" class="btn btn-ghost btn-sm" style="flex-shrink:0;text-decoration:none">⬇️ Baixar</a>`
-                : hasUrl
-                  ? `<a href="${escHtml(d.url)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="flex-shrink:0;text-decoration:none">🔗 Abrir</a>`
-                  : `<span style="font-size:11px;color:var(--text3);padding:4px 8px">sem arquivo</span>`;
-              return `<div class="doc-item">
-                <span class="doc-icon">${docIcon(d.name)}</span>
-                <div style="flex:1;min-width:0">
-                  <div class="doc-name">${escHtml(d.name)}</div>
-                  ${d.description?`<div class="doc-desc">${escHtml(d.description)}</div>`:''}
-                </div>
-                ${actionBtn}
-              </div>`;
-            }).join('')}
+            docs.map(d=>`<div class="doc-item"><span class="doc-icon">${docIcon(d.name)}</span><div style="flex:1;min-width:0"><div class="doc-name">${escHtml(d.name)}</div>${d.description?`<div class="doc-desc">${escHtml(d.description)}</div>`:''}</div></div>`).join('')}
         </div>
       </div>
       <div class="section-card" style="margin-bottom:0">
@@ -1616,23 +1600,13 @@ function renderDocsTab(c) {
   c.querySelector('#d-file').onclick = () => {
     const fi = document.getElementById('file-input');
     fi.onchange = e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
+      if (e.target.files[0]) {
         formData.documents = formData.documents || [];
-        formData.documents.push({
-          name: file.name,
-          description: c.querySelector('#d-desc').value,
-          size: file.size,
-          type: file.type,
-          data: ev.target.result  // base64 dataURL
-        });
-        c.querySelector('#d-desc').value = '';
+        formData.documents.push({ name: e.target.files[0].name, description: c.querySelector('#d-desc').value, size: e.target.files[0].size });
+        c.querySelector('#d-desc').value='';
         renderDList();
-        fi.value = '';
-      };
-      reader.readAsDataURL(file);
+        fi.value='';
+      }
     };
     fi.click();
   };
@@ -1640,9 +1614,7 @@ function renderDocsTab(c) {
     const name = c.querySelector('#d-name').value.trim();
     if (!name) return;
     formData.documents = formData.documents || [];
-    // Se for URL, salva como link
-    const isUrl = /^https?:\/\//i.test(name);
-    formData.documents.push({ name: isUrl ? name : name, description: c.querySelector('#d-desc').value, url: isUrl ? name : null });
+    formData.documents.push({ name, description: c.querySelector('#d-desc').value });
     c.querySelector('#d-name').value=''; c.querySelector('#d-desc').value='';
     renderDList();
   };
@@ -1654,9 +1626,8 @@ function renderDocsTab(c) {
       <div class="doc-item">
         <span class="doc-icon">${docIcon(d.name)}</span>
         <div style="flex:1;min-width:0">
-          <div class="doc-name">${escHtml(d.url || d.name)}</div>
+          <div class="doc-name">${escHtml(d.name)}</div>
           ${d.description?`<div class="doc-desc">${escHtml(d.description)}</div>`:''}
-          <div class="doc-desc">${d.data ? '✅ Arquivo carregado' : d.url ? '🔗 Link externo' : '📎 Referência por nome'}</div>
         </div>
         <button class="btn-icon" data-di="${i}">×</button>
       </div>`).join('');
