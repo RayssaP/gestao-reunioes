@@ -626,7 +626,7 @@
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -673,27 +673,28 @@
 
 <!-- AI SEARCH MODAL -->
 <div class="modal-overlay hidden" id="modal-ai-search">
-  <div class="modal" style="max-width:680px;width:calc(100vw - 32px);max-height:88vh;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:620px;width:calc(100vw - 32px);max-height:85vh;display:flex;flex-direction:column">
     <div class="modal-header" style="flex-shrink:0">
-      <div class="modal-title">🔎 Busca</div>
+      <div class="modal-title">🔎 Busca Inteligente</div>
       <button class="modal-close" id="btn-ai-search-close">×</button>
     </div>
-    <div style="flex-shrink:0;padding:0 0 12px">
-      <input class="inp" id="ai-search-input" placeholder="Buscar por título, pauta, participante, órgão, encaminhamento, data..." style="font-size:15px;padding:12px 14px"/>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" id="search-filter-chips">
-        <button class="chip active" data-sf="todos">Todos os campos</button>
-        <button class="chip" data-sf="titulo">Título</button>
-        <button class="chip" data-sf="participantes">Participantes</button>
-        <button class="chip" data-sf="pauta">Pauta</button>
-        <button class="chip" data-sf="encaminhamentos">Encaminhamentos</button>
-        <button class="chip" data-sf="data">Data</button>
+    <div style="flex-shrink:0;padding:0 0 14px">
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="ai-search-input" placeholder="Ex: reuniões sobre licitação, encaminhamentos do João, reuniões de março..." style="flex:1;font-size:14px"/>
+        <button class="btn btn-primary" id="btn-ai-search-send" style="flex-shrink:0;padding:9px 18px;font-size:14px">Buscar</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="ai-search-suggestions">
+        <button class="chip" data-sq="Quais reuniões tiveram encaminhamentos vencidos?">encaminhamentos vencidos</button>
+        <button class="chip" data-sq="Liste as reuniões realizadas com mais participantes">mais participantes</button>
+        <button class="chip" data-sq="Quais pautas se repetiram em mais de uma reunião?">pautas recorrentes</button>
+        <button class="chip" data-sq="Mostre os encaminhamentos pendentes por responsável">pendentes por responsável</button>
+        <button class="chip" data-sq="Qual foi a reunião mais recente?">última reunião</button>
       </div>
     </div>
-    <div id="ai-search-result" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;min-height:120px">
-      <div style="color:var(--text3);font-size:13px;font-style:italic;text-align:center;padding:24px">Digite algo para buscar nas suas reuniões...</div>
+    <div id="ai-search-result" style="flex:1;overflow-y:auto;padding:14px 16px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3);font-size:14px;line-height:1.8;color:var(--text);min-height:80px;white-space:pre-wrap">
+      <span style="color:var(--text3);font-style:italic">Faça uma pergunta sobre suas reuniões...</span>
     </div>
-    <div style="flex-shrink:0;margin-top:12px;display:flex;justify-content:space-between;align-items:center">
-      <span id="search-count" style="font-size:12px;color:var(--text3);font-family:var(--font-mono)"></span>
+    <div style="flex-shrink:0;margin-top:12px;display:flex;justify-content:flex-end">
       <button class="btn btn-ghost" id="btn-ai-search-cancel">Fechar</button>
     </div>
   </div>
@@ -2339,106 +2340,42 @@ function exportContactsCSV(m) {
   showToast(`📊 ${participants.length} contato(s) exportados!`);
 }
 
-// ===== BUSCA INSTANTÂNEA =====
-let searchFilter = 'todos';
-
-function highlight(text, term) {
-  if (!term) return escHtml(text);
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return escHtml(text).replace(new RegExp(`(${escaped})`, 'gi'), '<mark style="background:#FEF08A;color:#1E293B;border-radius:2px;padding:0 1px">$1</mark>');
-}
-
-function runSearch() {
-  const q = (document.getElementById('ai-search-input').value || '').trim().toLowerCase();
+// ===== BUSCA IA =====
+async function aiSearch(query) {
   const resultEl = document.getElementById('ai-search-result');
-  const countEl  = document.getElementById('search-count');
+  if (!query.trim()) return;
 
-  if (!q) {
-    resultEl.innerHTML = '<div style="color:var(--text3);font-size:13px;font-style:italic;text-align:center;padding:24px">Digite algo para buscar nas suas reuniões...</div>';
-    countEl.textContent = '';
-    return;
+  resultEl.innerHTML = '<span style="color:var(--text3)">🔎 Analisando suas reuniões...</span>';
+
+  const resumo = meetings.map(m => ({
+    id: m.id,
+    titulo: m.title || 'Sem título',
+    data: m.date || '',
+    status: m.status || '',
+    local: m.location || '',
+    participantes: (m.participants||[]).map(p=>p.name).join(', '),
+    pauta: m.agenda || '',
+    notas: m.notes || '',
+    encaminhamentos: (m.actions||[]).map(a =>
+      `${a.text}${a.responsible?' (resp: '+a.responsible+')':''}${a.deadline?' prazo: '+a.deadline:''}${a.done?' [concluído]':' [pendente]'}`
+    ).join('; ')
+  }));
+
+  const systemPrompt = `Você é um assistente especializado em análise de reuniões institucionais.
+O usuário tem ${meetings.length} reunião(ões) cadastrada(s) no sistema.
+Aqui estão os dados completos em JSON:
+${JSON.stringify(resumo, null, 2)}
+
+Responda em português brasileiro. Seja direto, objetivo e bem organizado.
+Quando listar reuniões, use formato de lista. Quando fizer análises, destaque pontos importantes.
+Se a pergunta não tiver relação com os dados, diga educadamente.`;
+
+  try {
+    const reply = await callAI(systemPrompt, query);
+    resultEl.textContent = reply;
+  } catch(e) {
+    resultEl.innerHTML = `<span style="color:#EF4444">${noKeyMessage(e)}</span>`;
   }
-
-  // Filtra reuniões que batem com o termo no campo selecionado
-  const results = meetings.map(m => {
-    const fields = {
-      titulo:          (m.title || '').toLowerCase(),
-      pauta:           ((m.agenda || '') + ' ' + (m.notes || '')).toLowerCase(),
-      participantes:   (m.participants || []).map(p => [p.name, p.org, p.email, p.phone].filter(Boolean).join(' ')).join(' ').toLowerCase(),
-      encaminhamentos: (m.actions || []).map(a => [a.text, a.responsible].filter(Boolean).join(' ')).join(' ').toLowerCase(),
-      data:            (m.date || '') + ' ' + fmtDate(m.date).toLowerCase(),
-      local:           (m.location || '').toLowerCase(),
-    };
-    const todos = Object.values(fields).join(' ');
-    const haystack = searchFilter === 'todos' ? todos : (fields[searchFilter] || todos);
-    if (!haystack.includes(q)) return null;
-
-    // Trechos onde o termo aparece (para mostrar contexto)
-    const matches = [];
-    if (searchFilter === 'todos' || searchFilter === 'titulo') {
-      if (fields.titulo.includes(q)) matches.push({ label: 'Título', text: m.title || '' });
-    }
-    if (searchFilter === 'todos' || searchFilter === 'pauta') {
-      const combined = (m.agenda || '') + (m.notes ? '\n' + m.notes : '');
-      if (fields.pauta.includes(q)) {
-        const idx = fields.pauta.indexOf(q);
-        const snippet = combined.slice(Math.max(0, idx-40), idx+80).replace(/\n/g,' ');
-        matches.push({ label: 'Pauta', text: '...' + snippet + '...' });
-      }
-    }
-    if (searchFilter === 'todos' || searchFilter === 'participantes') {
-      (m.participants||[]).forEach(p => {
-        const s = [p.name,p.org,p.email,p.phone].filter(Boolean).join(' ').toLowerCase();
-        if (s.includes(q)) matches.push({ label: '👤 ' + (p.name||''), text: [p.org, p.email, p.phone].filter(Boolean).join(' · ') });
-      });
-    }
-    if (searchFilter === 'todos' || searchFilter === 'encaminhamentos') {
-      (m.actions||[]).forEach(a => {
-        const s = [a.text, a.responsible].filter(Boolean).join(' ').toLowerCase();
-        if (s.includes(q)) matches.push({ label: a.done ? '✅' : '⏳', text: a.text + (a.responsible ? ' — ' + a.responsible : '') });
-      });
-    }
-    if (searchFilter === 'todos' || searchFilter === 'data') {
-      if (fields.data.includes(q)) matches.push({ label: 'Data', text: fmtDate(m.date) });
-    }
-    if (!matches.length) matches.push({ label: 'Correspondência', text: '' });
-    return { m, matches };
-  }).filter(Boolean);
-
-  countEl.textContent = results.length === 0 ? 'Nenhum resultado' : `${results.length} reunião(ões) encontrada(s)`;
-
-  if (results.length === 0) {
-    resultEl.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">🔍</div>Nenhuma reunião encontrada para "<strong>${escHtml(q)}</strong>"</div>`;
-    return;
-  }
-
-  resultEl.innerHTML = results.map(({ m, matches }) => `
-    <div class="meeting-search-card" data-id="${m.id}" style="background:var(--bg2);border:1px solid var(--bg3);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">
-        <div style="font-size:15px;font-weight:700;color:var(--text)">${highlight(m.title||'Sem título', q)}</div>
-        ${badge(m.status)}
-      </div>
-      <div style="font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-bottom:10px">
-        📅 ${fmtDate(m.date)}${m.location ? ' · 📍 ' + escHtml(m.location) : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        ${matches.map(mt => `
-          <div style="display:flex;gap:8px;font-size:12px">
-            <span style="color:var(--accent);font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">${escHtml(mt.label)}</span>
-            <span style="color:var(--text2)">${mt.text ? highlight(mt.text, q) : ''}</span>
-          </div>`).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  resultEl.querySelectorAll('.meeting-search-card').forEach(card => {
-    card.addEventListener('mouseenter', () => card.style.borderColor = 'var(--accent)');
-    card.addEventListener('mouseleave', () => card.style.borderColor = 'var(--bg3)');
-    card.addEventListener('click', () => {
-      document.getElementById('modal-ai-search').classList.add('hidden');
-      selectMeeting(card.dataset.id);
-    });
-  });
 }
 
 // ===== EVENTS =====
@@ -2762,19 +2699,17 @@ function toggleSidebar() {
 
 document.getElementById('btn-ai-search').onclick = () => {
   document.getElementById('modal-ai-search').classList.remove('hidden');
-  setTimeout(() => document.getElementById('ai-search-input').focus(), 50);
+  document.getElementById('ai-search-input').focus();
 };
 document.getElementById('btn-ai-search-close').onclick  = () => document.getElementById('modal-ai-search').classList.add('hidden');
 document.getElementById('btn-ai-search-cancel').onclick = () => document.getElementById('modal-ai-search').classList.add('hidden');
-document.getElementById('ai-search-input').addEventListener('input', runSearch);
-document.getElementById('ai-search-input').addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('modal-ai-search').classList.add('hidden'); });
-document.getElementById('search-filter-chips').addEventListener('click', e => {
-  const chip = e.target.closest('[data-sf]');
-  if (!chip) return;
-  searchFilter = chip.dataset.sf;
-  document.querySelectorAll('[data-sf]').forEach(c => c.classList.remove('active'));
-  chip.classList.add('active');
-  runSearch();
+document.getElementById('btn-ai-search-send').onclick   = () => aiSearch(document.getElementById('ai-search-input').value);
+document.getElementById('ai-search-input').addEventListener('keydown', e => { if (e.key==='Enter') aiSearch(e.target.value); });
+document.querySelectorAll('[data-sq]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.getElementById('ai-search-input').value = b.dataset.sq;
+    aiSearch(b.dataset.sq);
+  });
 });
 document.getElementById('modal-ai-search').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-ai-search')) document.getElementById('modal-ai-search').classList.add('hidden');
