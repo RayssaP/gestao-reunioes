@@ -487,6 +487,121 @@
 .dash-animate:nth-child(2) { animation-delay: 0.05s; }
 .dash-animate:nth-child(3) { animation-delay: 0.1s; }
 .dash-animate:nth-child(4) { animation-delay: 0.15s; }
+
+/* ===== PRINT / PDF ===== */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+
+  body, html { overflow: visible !important; height: auto !important; background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #header, #sidebar, #sidebar-overlay, #toast,
+  .detail-actions, #detail-back,
+  .action-toggle-btn, .action-edit-btn,
+  .participant-edit-btn,
+  .modal-overlay { display: none !important; }
+
+  #app, #main, #content { display: block !important; overflow: visible !important; height: auto !important; width: 100% !important; }
+  #view-detail { display: block !important; overflow: visible !important; height: auto !important; }
+  #view-empty, #view-form { display: none !important; }
+
+  #detail-view {
+    padding: 0 !important;
+    max-width: 100% !important;
+    font-family: Georgia, serif !important;
+    color: #1E293B !important;
+    width: 100% !important;
+  }
+
+  /* Cabeçalho */
+  .print-header {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #F59E0B;
+    margin-bottom: 10px;
+  }
+  .print-logo { display: flex !important; align-items: center; gap: 7px; font-size: 11px; color: #64748B; }
+  .print-logo-icon {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #F59E0B, #D97706);
+    border-radius: 5px;
+    display: flex !important; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+
+  .detail-header { margin-bottom: 8px !important; }
+  .detail-title { font-size: 18px !important; color: #1E293B !important; margin: 4px 0 2px !important; line-height: 1.2 !important; }
+  .detail-location { font-size: 11px !important; color: #64748B !important; margin: 2px 0 !important; }
+  .badge { font-size: 10px !important; padding: 2px 7px !important; }
+
+  /* Seções — SEM break-inside para não criar espaço em branco */
+  .section-card {
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    margin-bottom: 6px !important;
+    background: #fff !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  .section-head {
+    background: #F1F5F9 !important;
+    padding: 5px 10px !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+  }
+  .section-body { padding: 8px 10px !important; font-size: 13px !important; line-height: 1.6 !important; }
+  .section-empty { color: #94A3B8 !important; font-style: italic !important; font-size: 12px !important; }
+
+  /* Grids */
+  .grid2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px !important; margin-bottom: 6px !important; }
+  .grid-pauta { grid-template-columns: 1fr !important; gap: 4px !important; margin-bottom: 6px !important; }
+  .grid2auto { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important; gap: 6px !important; }
+
+  /* Encaminhamentos */
+  .item-card {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    padding: 7px 10px !important;
+    margin-bottom: 5px !important;
+    page-break-inside: avoid;
+  }
+  .item-title { font-size: 12px !important; color: #1E293B !important; }
+  .item-meta { font-size: 10px !important; color: #64748B !important; margin-top: 3px !important; display: flex; gap: 10px; flex-wrap: wrap; }
+  .item-status-pending { color: #F59E0B !important; }
+  .item-status-done    { color: #22C55E !important; }
+
+  /* Participantes */
+  .participant-card {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    padding: 7px 10px !important;
+    page-break-inside: avoid;
+  }
+  .participant-name { font-size: 12px !important; font-weight: 700 !important; color: #1E293B !important; }
+  .participant-org  { font-size: 10px !important; color: #F59E0B !important; }
+  .participant-contact { font-size: 10px !important; color: #475569 !important; margin-top: 3px !important; }
+
+  /* Documentos */
+  .doc-item { background: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-radius: 6px !important; padding: 6px 10px !important; margin-bottom: 4px !important; }
+  .doc-name { font-size: 12px !important; }
+  .doc-desc { font-size: 10px !important; color: #64748B !important; }
+
+  .print-footer {
+    display: block !important;
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid #E2E8F0;
+    font-size: 10px;
+    color: #94A3B8;
+    text-align: center;
+  }
+}
 </style>
 </head>
 <body>
@@ -508,7 +623,7 @@
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca IA</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -555,28 +670,27 @@
 
 <!-- AI SEARCH MODAL -->
 <div class="modal-overlay hidden" id="modal-ai-search">
-  <div class="modal" style="max-width:620px;width:calc(100vw - 32px);max-height:85vh;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:680px;width:calc(100vw - 32px);max-height:88vh;display:flex;flex-direction:column">
     <div class="modal-header" style="flex-shrink:0">
-      <div class="modal-title">🔎 Busca Inteligente</div>
+      <div class="modal-title">🔎 Busca</div>
       <button class="modal-close" id="btn-ai-search-close">×</button>
     </div>
-    <div style="flex-shrink:0;padding:0 0 14px">
-      <div style="display:flex;gap:8px">
-        <input class="inp" id="ai-search-input" placeholder="Ex: reuniões sobre licitação, encaminhamentos do João, reuniões de março..." style="flex:1;font-size:14px"/>
-        <button class="btn btn-primary" id="btn-ai-search-send" style="flex-shrink:0;padding:9px 18px;font-size:14px">Buscar</button>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="ai-search-suggestions">
-        <button class="chip" data-sq="Quais reuniões tiveram encaminhamentos vencidos?">encaminhamentos vencidos</button>
-        <button class="chip" data-sq="Liste as reuniões realizadas com mais participantes">mais participantes</button>
-        <button class="chip" data-sq="Quais pautas se repetiram em mais de uma reunião?">pautas recorrentes</button>
-        <button class="chip" data-sq="Mostre os encaminhamentos pendentes por responsável">pendentes por responsável</button>
-        <button class="chip" data-sq="Qual foi a reunião mais recente?">última reunião</button>
+    <div style="flex-shrink:0;padding:0 0 12px">
+      <input class="inp" id="ai-search-input" placeholder="Buscar por título, pauta, participante, órgão, encaminhamento, data..." style="font-size:15px;padding:12px 14px"/>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" id="search-filter-chips">
+        <button class="chip active" data-sf="todos">Todos os campos</button>
+        <button class="chip" data-sf="titulo">Título</button>
+        <button class="chip" data-sf="participantes">Participantes</button>
+        <button class="chip" data-sf="pauta">Pauta</button>
+        <button class="chip" data-sf="encaminhamentos">Encaminhamentos</button>
+        <button class="chip" data-sf="data">Data</button>
       </div>
     </div>
-    <div id="ai-search-result" style="flex:1;overflow-y:auto;padding:14px 16px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3);font-size:14px;line-height:1.8;color:var(--text);min-height:80px;white-space:pre-wrap">
-      <span style="color:var(--text3);font-style:italic">Faça uma pergunta sobre suas reuniões...</span>
+    <div id="ai-search-result" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;min-height:120px">
+      <div style="color:var(--text3);font-size:13px;font-style:italic;text-align:center;padding:24px">Digite algo para buscar nas suas reuniões...</div>
     </div>
-    <div style="flex-shrink:0;margin-top:12px;display:flex;justify-content:flex-end">
+    <div style="flex-shrink:0;margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <span id="search-count" style="font-size:12px;color:var(--text3);font-family:var(--font-mono)"></span>
       <button class="btn btn-ghost" id="btn-ai-search-cancel">Fechar</button>
     </div>
   </div>
@@ -610,9 +724,13 @@
             <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar agora</button>
-            <button class="btn btn-ghost btn-sm" id="btn-od-import" style="flex:1;justify-content:center;min-width:110px">⬇️ Carregar do Drive</button>
+            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">⬇️ Buscar do Drive</button>
+            <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
+          </div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
+            ⬇️ <strong>Buscar do Drive</strong> — substitui os dados locais pelos do Drive<br>
+            ⬆️ <strong>Enviar ao Drive</strong> — substitui os dados do Drive pelos locais
           </div>
         </div>
 
@@ -720,6 +838,76 @@
   </div>
 </div>
 
+<!-- EDIT PARTICIPANT MODAL -->
+<div class="modal-overlay hidden" id="modal-edit-participant">
+  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Participante</div>
+      <button class="modal-close" id="btn-edit-participant-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="lbl">Nome *</label>
+        <input class="inp" id="edit-p-name" placeholder="Nome completo"/>
+      </div>
+      <div>
+        <label class="lbl">Órgão / Instituição</label>
+        <input class="inp" id="edit-p-org" placeholder="Ex: Secretaria de Saúde"/>
+      </div>
+      <div class="grid2">
+        <div>
+          <label class="lbl">E-mail</label>
+          <input class="inp" id="edit-p-email" type="email" placeholder="email@exemplo.com"/>
+        </div>
+        <div>
+          <label class="lbl">Telefone</label>
+          <input class="inp" id="edit-p-phone" placeholder="(00) 00000-0000"/>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-danger btn-sm" id="btn-edit-participant-delete">🗑️ Remover</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost" id="btn-edit-participant-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-edit-participant-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ACTION MODAL -->
+<div class="modal-overlay hidden" id="modal-edit-action">
+  <div class="modal" style="max-width:480px;width:calc(100vw - 32px)">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Encaminhamento</div>
+      <button class="modal-close" id="btn-edit-action-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="lbl">Encaminhamento *</label>
+        <textarea class="inp" id="edit-action-text" style="min-height:80px" placeholder="Descreva o encaminhamento..."></textarea>
+      </div>
+      <div class="grid2">
+        <div>
+          <label class="lbl">Responsável</label>
+          <input class="inp" id="edit-action-resp" placeholder="Nome do responsável"/>
+        </div>
+        <div>
+          <label class="lbl">Prazo</label>
+          <input class="inp" type="date" id="edit-action-deadline"/>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="edit-action-done" style="width:16px;height:16px;accent-color:#22C55E"/>
+        <label for="edit-action-done" style="font-size:14px;color:var(--text2);cursor:pointer">Marcar como concluído</label>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="btn-edit-action-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-edit-action-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay hidden" id="modal-delete">
   <div class="modal">
@@ -766,6 +954,10 @@ let odTokenData = null;   // mantive os nomes para minimizar mudanças no restan
 let odUserInfo = null;
 let odPollTimer = null;
 let googleTokenClient = null;
+let odSyncQueue = Promise.resolve();
+let syncMeta = JSON.parse(localStorage.getItem('reunioes-sync-meta') || '{"deleted":{}}');
+if (!syncMeta || typeof syncMeta !== 'object') syncMeta = { deleted: {} };
+if (!syncMeta.deleted || typeof syncMeta.deleted !== 'object') syncMeta.deleted = {};
 
 function odSaveTokens(data) {
   odTokenData = data;
@@ -782,6 +974,95 @@ function odClearTokens() {
   delete settings.gdFolderId;
   delete settings.gdFileId;
   saveSettings();
+}
+
+function saveSyncMeta() {
+  localStorage.setItem('reunioes-sync-meta', JSON.stringify(syncMeta));
+}
+function ts(v) {
+  const n = new Date(v || 0).getTime();
+  return Number.isFinite(n) ? n : 0;
+}
+function normalizeMeeting(meeting) {
+  if (!meeting || typeof meeting !== 'object') return null;
+  const m = { ...meeting };
+  if (!m.id) m.id = genId();
+  if (!m.createdAt) m.createdAt = m.updatedAt || new Date().toISOString();
+  if (!m.updatedAt) m.updatedAt = m.createdAt;
+  return m;
+}
+function normalizeDrivePayload(data) {
+  const payload = Array.isArray(data) ? { meetings: data, deleted: {} } : (data || {});
+  const remoteMeetings = Array.isArray(payload.meetings) ? payload.meetings.map(normalizeMeeting).filter(Boolean) : [];
+  const remoteDeleted = payload.deleted && typeof payload.deleted === 'object' ? payload.deleted : {};
+  return { meetings: remoteMeetings, deleted: remoteDeleted };
+}
+function mergeStates(localMeetings, localDeleted, remoteMeetings, remoteDeleted) {
+  const deleted = {};
+  for (const [id, when] of Object.entries(remoteDeleted || {})) {
+    if (!id) continue;
+    deleted[id] = when;
+  }
+  for (const [id, when] of Object.entries(localDeleted || {})) {
+    if (!id) continue;
+    if (!deleted[id] || ts(when) > ts(deleted[id])) deleted[id] = when;
+  }
+
+  const map = new Map();
+  for (const src of [...(remoteMeetings || []), ...(localMeetings || [])]) {
+    const m = normalizeMeeting(src);
+    if (!m) continue;
+    const current = map.get(m.id);
+    if (!current || ts(m.updatedAt) >= ts(current.updatedAt)) {
+      map.set(m.id, m);
+    }
+  }
+
+  for (const [id, deletedAt] of Object.entries(deleted)) {
+    const m = map.get(id);
+    if (m && ts(deletedAt) >= ts(m.updatedAt)) map.delete(id);
+  }
+
+  const mergedMeetings = Array.from(map.values()).sort((a, b) => {
+    const db = ts(b.date || b.updatedAt || b.createdAt);
+    const da = ts(a.date || a.updatedAt || a.createdAt);
+    return db - da;
+  });
+
+  return { meetings: mergedMeetings, deleted };
+}
+function persistStateLocally() {
+  save();
+  saveSyncMeta();
+}
+function refreshCurrentViewAfterSync() {
+  renderSidebar();
+  renderDashboard();
+  if (currentView === 'detail') {
+    const current = meetings.find(m => m.id === selectedId);
+    if (current) renderDetail(current);
+    else {
+      selectedId = null;
+      showView('empty');
+    }
+  }
+}
+function markMeetingUpdated(meeting) {
+  if (!meeting) return meeting;
+  const now = new Date().toISOString();
+  meeting.updatedAt = now;
+  if (!meeting.createdAt) meeting.createdAt = now;
+  if (meeting.id && syncMeta.deleted[meeting.id]) delete syncMeta.deleted[meeting.id];
+  return meeting;
+}
+function markMeetingDeleted(id) {
+  if (!id) return;
+  syncMeta.deleted[id] = new Date().toISOString();
+}
+function queueOd(task) {
+  const next = odSyncQueue.then(task, task);
+  odSyncQueue = next.catch(() => {});
+  return next;
 }
 
 function hasValidGoogleToken() {
@@ -913,79 +1194,97 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
   return data.id;
 }
  
-async function odSaveIndex() {
+async function odFetchRemotePayload() {
   const folderId = await ensureFolder();
   const fileId = await gdFindDataFile(folderId);
+  if (!fileId) return { fileId: null, payload: { meetings: [], deleted: {} }, folderId };
+  const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
+  if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
+  const data = await r.json();
+  return { fileId, payload: normalizeDrivePayload(data), folderId };
+}
+
+async function odSaveIndex(payload = null) {
+  const folderId = await ensureFolder();
+  const fileId = await gdFindDataFile(folderId);
+  const content = payload || { meetings, deleted: syncMeta.deleted };
   await uploadDriveJson(fileId, folderId, {
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
-    meetings
+    meetings: (content.meetings || []).map(normalizeMeeting).filter(Boolean),
+    deleted: content.deleted || {}
+  });
+}
+
+async function odPushLocalToDrive(options = {}) {
+  const { silent = false, forceInteractive = false } = options;
+  return queueOd(async () => {
+    setOdStatus('syncing', 'Sincronizando…');
+    try {
+      await ensureGoogleAccess(forceInteractive);
+      const remote = await odFetchRemotePayload();
+      const merged = mergeStates(meetings, syncMeta.deleted, remote.payload.meetings, remote.payload.deleted);
+      meetings = merged.meetings;
+      syncMeta.deleted = merged.deleted;
+      persistStateLocally();
+      await odSaveIndex({ meetings, deleted: syncMeta.deleted });
+      settings.odLastSync = new Date().toISOString();
+      saveSettings();
+      setOdStatus('on', 'Drive ✓');
+      updateLastSync();
+      refreshCurrentViewAfterSync();
+      if (!silent) showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
+      return true;
+    } catch (e) {
+      setOdStatus('err', 'Erro');
+      if (!silent) showToast('Erro Google Drive: ' + e.message, 'info');
+      throw e;
+    }
   });
 }
 
 async function odSaveMeeting(meeting) {
   if (!meeting) return;
-  setOdStatus('syncing', 'Salvando…');
-  try {
-    const idx = meetings.findIndex(m => m.id === meeting.id);
-    if (idx >= 0) meetings[idx] = meeting;
-    await odSaveIndex();
-    settings.odLastSync = new Date().toISOString();
-    saveSettings();
-    setOdStatus('on', 'Drive ✓');
-    updateLastSync();
-  } catch (e) {
-    setOdStatus('err', 'Erro');
-    showToast('Erro Google Drive: ' + e.message, 'info');
-  }
+  const idx = meetings.findIndex(m => m.id === meeting.id);
+  if (idx >= 0) meetings[idx] = markMeetingUpdated(meeting);
+  persistStateLocally();
+  return odPushLocalToDrive({ silent: true });
 }
 
 async function odDeleteMeeting(id) {
-  try {
-    await odSaveIndex();
-  } catch(e) {}
+  if (id) markMeetingDeleted(id);
+  persistStateLocally();
+  return odPushLocalToDrive({ silent: true });
 }
 
 async function odSyncAll() {
-  setOdStatus('syncing', 'Sincronizando…');
-  try {
-    await odSaveIndex();
-    settings.odLastSync = new Date().toISOString();
-    saveSettings();
-    setOdStatus('on', 'Drive ✓');
-    updateLastSync();
-    showToast(`☁️ ${meetings.length} reuniões salvas no Google Drive!`);
-  } catch (e) {
-    setOdStatus('err', 'Erro');
-    showToast('Erro: ' + e.message, 'info');
-  }
+  return odPushLocalToDrive({ silent: false, forceInteractive: false });
 }
 
-async function odLoadAll() {
-  setOdStatus('syncing', 'Baixando…');
-  try {
-    const folderId = await ensureFolder();
-    const fileId = await gdFindDataFile(folderId);
-    if (!fileId) {
-      await odSyncAll();
-      return;
+async function odLoadAll(options = {}) {
+  const { silent = false } = options;
+  return queueOd(async () => {
+    setOdStatus('syncing', 'Baixando…');
+    try {
+      await ensureGoogleAccess(false);
+      const remote = await odFetchRemotePayload();
+      const merged = mergeStates(meetings, syncMeta.deleted, remote.payload.meetings, remote.payload.deleted);
+      meetings = merged.meetings;
+      syncMeta.deleted = merged.deleted;
+      persistStateLocally();
+      refreshCurrentViewAfterSync();
+      settings.odLastSync = new Date().toISOString();
+      saveSettings();
+      setOdStatus('on', 'Drive ✓');
+      updateLastSync();
+      if (!silent) showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
+      return true;
+    } catch (e) {
+      setOdStatus('err', 'Erro ao baixar');
+      if (!silent) showToast('Erro: ' + e.message, 'info');
+      throw e;
     }
-    const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
-    if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
-    const data = await r.json();
-    meetings = Array.isArray(data) ? data : (data.meetings || []);
-    localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-    renderSidebar();
-    renderDashboard();
-    settings.odLastSync = new Date().toISOString();
-    saveSettings();
-    setOdStatus('on', 'Drive ✓');
-    updateLastSync();
-    showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
-  } catch (e) {
-    setOdStatus('err', 'Erro ao baixar');
-    showToast('Erro: ' + e.message, 'info');
-  }
+  });
 }
 
 async function odFetchUser() {
@@ -1111,7 +1410,7 @@ let autoSyncTimer = null;
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   if (!settings.autoSync) return;
-  const mins = parseInt(settings.autoSyncInterval || 30);
+  const mins = parseInt(settings.autoSyncInterval || 1);
   autoSyncTimer = setInterval(async () => {
     if (hasValidGoogleToken() || settings.odClientId) {
       try { await odLoadAll(); } catch(e) {}
@@ -1134,7 +1433,7 @@ function initAutoSyncUI() {
   }
 
   toggle.checked = !!settings.autoSync;
-  sel.value = String(settings.autoSyncInterval || 30);
+  sel.value = String(settings.autoSyncInterval || 1);
   updateSliderUI(!!settings.autoSync);
 
   toggle.onchange = () => {
@@ -1142,16 +1441,19 @@ function initAutoSyncUI() {
     saveSettings();
     updateSliderUI(toggle.checked);
     startAutoSync();
+    if (toggle.checked) odLoadAll({ silent: true }).catch(() => {});
   };
   sel.onchange = () => {
     settings.autoSyncInterval = parseInt(sel.value);
     saveSettings();
     startAutoSync();
+    if (settings.autoSync) odLoadAll({ silent: true }).catch(() => {});
   };
 }
 
-// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 30 min) ──
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
+// ── Auto-sync inicial (usa configuração salva, padrão: ligado, 1 min) ──
+if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings(); }
+if (!settings.autoSyncInterval || Number(settings.autoSyncInterval) > 5) { settings.autoSyncInterval = 1; saveSettings(); }
 
 // ── Restore session on page load ──
 async function restoreOdSession() {
@@ -1166,16 +1468,17 @@ async function restoreOdSession() {
   if (hasToken || hasClientId) {
     // Tenta carregar do Drive (renovação silenciosa automática se token expirou)
     try {
-      await odLoadAll();
+      await odLoadAll({ silent: true });
     } catch(e) {
       // Falhou — tenta renovação silenciosa forçada
       try {
         await ensureGoogleAccess(false);
-        await odLoadAll();
+        await odLoadAll({ silent: true });
       } catch(e2) {
-        // Renovação silenciosa falhou — usuário precisa reconectar manualmente
-        setOdStatus('off', 'Reconectar');
+        // Renovação silenciosa falhou — avisa que dados podem estar desatualizados
+        setOdStatus('err', 'Reconectar');
         updateOdUI();
+        showToast('⚠️ Não foi possível sincronizar com o Drive. Os dados exibidos podem estar desatualizados. Clique em "Reconectar" nas Configurações.', 'info');
       }
     }
   }
@@ -1266,6 +1569,15 @@ function renderDetail(m) {
   const docs = m.documents || [];
 
   document.getElementById('detail-view').innerHTML = `
+    <div class="print-header">
+      <div class="print-logo">
+        <div class="print-logo-icon">📋</div>
+        <div><div style="font-weight:700;color:#1E293B;font-size:14px">Gestão de Reuniões</div><div style="font-size:11px;color:#94A3B8">Documento gerado em ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#94A3B8">
+        ${fmtDate(m.date)}${m.time ? ' · ' + m.time : ''}
+      </div>
+    </div>
     <div class="detail-header">
       <div>
         <button class="btn btn-ghost btn-sm" id="detail-back" style="margin-bottom:12px;gap:6px;font-size:12px;color:var(--text3)">← Painel</button>
@@ -1277,12 +1589,14 @@ function renderDetail(m) {
         ${m.location?`<div class="detail-location">📍 ${escHtml(m.location)}</div>`:''}
       </div>
       <div class="detail-actions">
+        <button class="btn btn-ghost btn-sm" id="detail-export-csv" title="Exportar contatos em CSV">📊 Contatos</button>
+        <button class="btn btn-ghost btn-sm" id="detail-export-pdf" title="Exportar reunião em PDF">📄 PDF</button>
         <button class="btn btn-ghost" id="detail-edit">✏️ Editar</button>
         <button class="btn btn-ghost" id="detail-delete" style="border-color:#7F1D1D;color:#FCA5A5">🗑️</button>
       </div>
     </div>
 
-    <div class="grid2" style="margin-bottom:20px">
+    <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
         <div class="section-body">${m.agenda?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
@@ -1311,10 +1625,17 @@ function renderDetail(m) {
                 <div class="item-title" style="${a.done?'text-decoration:line-through;color:var(--text3)':''}">${escHtml(a.text)}</div>
                 <div class="item-meta">
                   ${a.responsible?`<span>👤 ${escHtml(a.responsible)}</span>`:''}
-                  ${a.deadline?`<span>📅 Prazo: ${fmtDate(a.deadline)}</span>`:''}
+                  ${(() => {
+                    const hoje = new Date(); hoje.setHours(0,0,0,0);
+                    const vencido = a.deadline && new Date(a.deadline+'T00:00:00') < hoje && !a.done;
+                    return a.deadline
+                      ? `<span style="color:${vencido?'#EF4444':'#F59E0B'}">📅 ${vencido?'Vencido: ':'Prazo: '}${fmtDate(a.deadline)}</span>`
+                      : `<span style="color:var(--text3)">📅 Sem prazo</span>`;
+                  })()}
                   <span class="${a.done?'item-status-done':'item-status-pending'}">${a.done?'Concluído':'Pendente'}</span>
                 </div>
               </div>
+              <button class="btn btn-ghost btn-sm action-edit-btn" data-action-idx="${i}" style="flex-shrink:0;font-size:13px" title="Editar encaminhamento">✏️</button>
             </div>`).join('')}
       </div>
     </div>
@@ -1323,8 +1644,10 @@ function renderDetail(m) {
       <div class="section-head">👥 Participantes</div>
       <div class="section-body">
         ${participants.length===0?'<div class="section-empty">Nenhum participante registrado</div>':
-          `<div class="grid2auto">${participants.map(p=>`
-            <div class="participant-card">
+          `<div class="grid2auto">${participants.map((p,i)=>`
+            <div class="participant-card" style="position:relative">
+              <button class="participant-edit-btn btn btn-ghost btn-sm" data-p-idx="${i}"
+                style="position:absolute;top:8px;right:8px;padding:3px 7px;font-size:12px" title="Editar participante">✏️</button>
               <div class="participant-name">${escHtml(p.name)}</div>
               ${p.org?`<div class="participant-org">${escHtml(p.org)}</div>`:''}
               <div class="participant-contact">
@@ -1367,6 +1690,9 @@ function renderDetail(m) {
         </div>
       </div>
     </div>
+    <div class="print-footer">
+      Gestão de Reuniões · Documento gerado em ${new Date().toLocaleString('pt-BR')} · Confidencial
+    </div>
   `;
 
   document.getElementById('detail-back').onclick = () => {
@@ -1374,8 +1700,11 @@ function renderDetail(m) {
     renderSidebar();
     showView('empty');
   };
-  document.getElementById('detail-edit').onclick = () => openForm(m);
+  document.getElementById('detail-edit').onclick   = () => openForm(m);
   document.getElementById('detail-delete').onclick = () => confirmDelete(m);
+
+  document.getElementById('detail-export-pdf').onclick = () => exportMeetingPDF(m);
+  document.getElementById('detail-export-csv').onclick = () => exportContactsCSV(m);
   document.querySelectorAll('[data-ref-id]').forEach(el => {
     el.addEventListener('click', () => selectMeeting(el.dataset.refId));
   });
@@ -1387,13 +1716,96 @@ function renderDetail(m) {
       const meeting = meetings.find(x => x.id === m.id);
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-      if (odTokenData) odSaveMeeting(meeting);
+      persistStateLocally();
+      odSaveMeeting(meeting).catch(() => {});
       renderSidebar();
-      renderDetail(meeting); // re-render in place
+      renderDetail(meeting);
+    });
+  });
+
+  // Editar participante
+  document.querySelectorAll('.participant-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.pIdx);
+      const meeting = meetings.find(x => x.id === m.id);
+      if (!meeting) return;
+      const p = meeting.participants[idx];
+      document.getElementById('edit-p-name').value  = p.name  || '';
+      document.getElementById('edit-p-org').value   = p.org   || '';
+      document.getElementById('edit-p-email').value = p.email || '';
+      document.getElementById('edit-p-phone').value = p.phone || '';
+      document.getElementById('modal-edit-participant').classList.remove('hidden');
+
+      document.getElementById('btn-edit-participant-save').onclick = () => {
+        const name = document.getElementById('edit-p-name').value.trim();
+        if (!name) { showToast('Preencha o nome do participante.', 'info'); return; }
+        meeting.participants[idx] = {
+          ...meeting.participants[idx],
+          name,
+          org:   document.getElementById('edit-p-org').value.trim(),
+          email: document.getElementById('edit-p-email').value.trim(),
+          phone: document.getElementById('edit-p-phone').value.trim()
+        };
+        persistStateLocally();
+        odSaveMeeting(meeting).catch(() => {});
+        document.getElementById('modal-edit-participant').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('✅ Participante atualizado!');
+      };
+
+      document.getElementById('btn-edit-participant-delete').onclick = () => {
+        if (!confirm(`Remover "${p.name}" da reunião?`)) return;
+        meeting.participants.splice(idx, 1);
+        persistStateLocally();
+        odSaveMeeting(meeting).catch(() => {});
+        document.getElementById('modal-edit-participant').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('Participante removido.', 'info');
+      };
+    });
+  });
+  document.querySelectorAll('.action-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.actionIdx);
+      const meeting = meetings.find(x => x.id === m.id);
+      if (!meeting) return;
+      const a = meeting.actions[idx];
+      document.getElementById('edit-action-text').value     = a.text || '';
+      document.getElementById('edit-action-resp').value     = a.responsible || '';
+      document.getElementById('edit-action-deadline').value = a.deadline || '';
+      document.getElementById('edit-action-done').checked   = !!a.done;
+      document.getElementById('modal-edit-action').classList.remove('hidden');
+
+      document.getElementById('btn-edit-action-save').onclick = () => {
+        const text = document.getElementById('edit-action-text').value.trim();
+        if (!text) { showToast('Preencha o encaminhamento.', 'info'); return; }
+        meeting.actions[idx] = {
+          ...meeting.actions[idx],
+          text,
+          responsible: document.getElementById('edit-action-resp').value.trim(),
+          deadline:    document.getElementById('edit-action-deadline').value,
+          done:        document.getElementById('edit-action-done').checked
+        };
+        persistStateLocally();
+        odSaveMeeting(meeting).catch(() => {});
+        document.getElementById('modal-edit-action').classList.add('hidden');
+        renderSidebar();
+        renderDetail(meeting);
+        showToast('✅ Encaminhamento atualizado!');
+      };
     });
   });
 }
+
+// Fechar modal de edição de encaminhamento
+document.getElementById('btn-edit-action-close').onclick  = () => document.getElementById('modal-edit-action').classList.add('hidden');
+document.getElementById('btn-edit-action-cancel').onclick = () => document.getElementById('modal-edit-action').classList.add('hidden');
+
+// Fechar modal de edição de participante
+document.getElementById('btn-edit-participant-close').onclick  = () => document.getElementById('modal-edit-participant').classList.add('hidden');
+document.getElementById('btn-edit-participant-cancel').onclick = () => document.getElementById('modal-edit-participant').classList.add('hidden');
 
 function confirmDelete(m) {
   deleteTarget = m.id;
@@ -1710,8 +2122,9 @@ function saveForm() {
     meetings.unshift(formData);
     selectedId = formData.id;
   }
-  save();
-  if (odTokenData) odSaveMeeting(formData);
+  markMeetingUpdated(formData);
+  persistStateLocally();
+  odSaveMeeting(formData).catch(() => {});
   renderSidebar();
   const m = meetings.find(m=>m.id===selectedId);
   if (m) renderDetail(m);
@@ -2003,42 +2416,146 @@ function noKeyMessage(err) {
   return '❌ Erro: ' + msg;
 }
 
-// ===== BUSCA IA =====
-async function aiSearch(query) {
-  const resultEl = document.getElementById('ai-search-result');
-  if (!query.trim()) return;
+// ===== EXPORTAÇÕES =====
 
-  resultEl.innerHTML = '<span style="color:var(--text3)">🔎 Analisando suas reuniões...</span>';
+function exportMeetingPDF(m) {
+  // Guarda título original
+  const origTitle = document.title;
+  document.title = (m.title || 'Reunião') + ' — ' + fmtDate(m.date);
+  window.print();
+  document.title = origTitle;
+}
 
-  const resumo = meetings.map(m => ({
-    id: m.id,
-    titulo: m.title || 'Sem título',
-    data: m.date || '',
-    status: m.status || '',
-    local: m.location || '',
-    participantes: (m.participants||[]).map(p=>p.name).join(', '),
-    pauta: m.agenda || '',
-    notas: m.notes || '',
-    encaminhamentos: (m.actions||[]).map(a =>
-      `${a.text}${a.responsible?' (resp: '+a.responsible+')':''}${a.deadline?' prazo: '+a.deadline:''}${a.done?' [concluído]':' [pendente]'}`
-    ).join('; ')
-  }));
-
-  const systemPrompt = `Você é um assistente especializado em análise de reuniões institucionais.
-O usuário tem ${meetings.length} reunião(ões) cadastrada(s) no sistema.
-Aqui estão os dados completos em JSON:
-${JSON.stringify(resumo, null, 2)}
-
-Responda em português brasileiro. Seja direto, objetivo e bem organizado.
-Quando listar reuniões, use formato de lista. Quando fizer análises, destaque pontos importantes.
-Se a pergunta não tiver relação com os dados, diga educadamente.`;
-
-  try {
-    const reply = await callAI(systemPrompt, query);
-    resultEl.textContent = reply;
-  } catch(e) {
-    resultEl.innerHTML = `<span style="color:#EF4444">${noKeyMessage(e)}</span>`;
+function exportContactsCSV(m) {
+  const participants = m.participants || [];
+  if (participants.length === 0) {
+    showToast('Nenhum participante para exportar.', 'info');
+    return;
   }
+  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reunião', 'Data'];
+  const rows = participants.map(p => [
+    p.name  || '',
+    p.org   || '',
+    p.email || '',
+    p.phone || '',
+    m.title || '',
+    fmtDate(m.date)
+  ]);
+  const csvContent = [header, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+
+  // BOM para abrir corretamente no Excel com acentos
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `contatos_${(m.title||'reuniao').replace(/\s+/g,'_')}_${m.date||'sem_data'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📊 ${participants.length} contato(s) exportados!`);
+}
+
+// ===== BUSCA INSTANTÂNEA =====
+let searchFilter = 'todos';
+
+function highlight(text, term) {
+  if (!term) return escHtml(text);
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escHtml(text).replace(new RegExp(`(${escaped})`, 'gi'), '<mark style="background:#FEF08A;color:#1E293B;border-radius:2px;padding:0 1px">$1</mark>');
+}
+
+function runSearch() {
+  const q = (document.getElementById('ai-search-input').value || '').trim().toLowerCase();
+  const resultEl = document.getElementById('ai-search-result');
+  const countEl  = document.getElementById('search-count');
+
+  if (!q) {
+    resultEl.innerHTML = '<div style="color:var(--text3);font-size:13px;font-style:italic;text-align:center;padding:24px">Digite algo para buscar nas suas reuniões...</div>';
+    countEl.textContent = '';
+    return;
+  }
+
+  // Filtra reuniões que batem com o termo no campo selecionado
+  const results = meetings.map(m => {
+    const fields = {
+      titulo:          (m.title || '').toLowerCase(),
+      pauta:           ((m.agenda || '') + ' ' + (m.notes || '')).toLowerCase(),
+      participantes:   (m.participants || []).map(p => [p.name, p.org, p.email, p.phone].filter(Boolean).join(' ')).join(' ').toLowerCase(),
+      encaminhamentos: (m.actions || []).map(a => [a.text, a.responsible].filter(Boolean).join(' ')).join(' ').toLowerCase(),
+      data:            (m.date || '') + ' ' + fmtDate(m.date).toLowerCase(),
+      local:           (m.location || '').toLowerCase(),
+    };
+    const todos = Object.values(fields).join(' ');
+    const haystack = searchFilter === 'todos' ? todos : (fields[searchFilter] || todos);
+    if (!haystack.includes(q)) return null;
+
+    // Trechos onde o termo aparece (para mostrar contexto)
+    const matches = [];
+    if (searchFilter === 'todos' || searchFilter === 'titulo') {
+      if (fields.titulo.includes(q)) matches.push({ label: 'Título', text: m.title || '' });
+    }
+    if (searchFilter === 'todos' || searchFilter === 'pauta') {
+      const combined = (m.agenda || '') + (m.notes ? '\n' + m.notes : '');
+      if (fields.pauta.includes(q)) {
+        const idx = fields.pauta.indexOf(q);
+        const snippet = combined.slice(Math.max(0, idx-40), idx+80).replace(/\n/g,' ');
+        matches.push({ label: 'Pauta', text: '...' + snippet + '...' });
+      }
+    }
+    if (searchFilter === 'todos' || searchFilter === 'participantes') {
+      (m.participants||[]).forEach(p => {
+        const s = [p.name,p.org,p.email,p.phone].filter(Boolean).join(' ').toLowerCase();
+        if (s.includes(q)) matches.push({ label: '👤 ' + (p.name||''), text: [p.org, p.email, p.phone].filter(Boolean).join(' · ') });
+      });
+    }
+    if (searchFilter === 'todos' || searchFilter === 'encaminhamentos') {
+      (m.actions||[]).forEach(a => {
+        const s = [a.text, a.responsible].filter(Boolean).join(' ').toLowerCase();
+        if (s.includes(q)) matches.push({ label: a.done ? '✅' : '⏳', text: a.text + (a.responsible ? ' — ' + a.responsible : '') });
+      });
+    }
+    if (searchFilter === 'todos' || searchFilter === 'data') {
+      if (fields.data.includes(q)) matches.push({ label: 'Data', text: fmtDate(m.date) });
+    }
+    if (!matches.length) matches.push({ label: 'Correspondência', text: '' });
+    return { m, matches };
+  }).filter(Boolean);
+
+  countEl.textContent = results.length === 0 ? 'Nenhum resultado' : `${results.length} reunião(ões) encontrada(s)`;
+
+  if (results.length === 0) {
+    resultEl.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">🔍</div>Nenhuma reunião encontrada para "<strong>${escHtml(q)}</strong>"</div>`;
+    return;
+  }
+
+  resultEl.innerHTML = results.map(({ m, matches }) => `
+    <div class="meeting-search-card" data-id="${m.id}" style="background:var(--bg2);border:1px solid var(--bg3);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">
+        <div style="font-size:15px;font-weight:700;color:var(--text)">${highlight(m.title||'Sem título', q)}</div>
+        ${badge(m.status)}
+      </div>
+      <div style="font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-bottom:10px">
+        📅 ${fmtDate(m.date)}${m.location ? ' · 📍 ' + escHtml(m.location) : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${matches.map(mt => `
+          <div style="display:flex;gap:8px;font-size:12px">
+            <span style="color:var(--accent);font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">${escHtml(mt.label)}</span>
+            <span style="color:var(--text2)">${mt.text ? highlight(mt.text, q) : ''}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  resultEl.querySelectorAll('.meeting-search-card').forEach(card => {
+    card.addEventListener('mouseenter', () => card.style.borderColor = 'var(--accent)');
+    card.addEventListener('mouseleave', () => card.style.borderColor = 'var(--bg3)');
+    card.addEventListener('click', () => {
+      document.getElementById('modal-ai-search').classList.add('hidden');
+      selectMeeting(card.dataset.id);
+    });
+  });
 }
 
 // ===== EVENTS =====
@@ -2065,7 +2582,11 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 document.getElementById('btn-od-connect').onclick    = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
 document.getElementById('btn-od-sync-now').onclick   = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
-document.getElementById('btn-od-import').onclick     = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
+document.getElementById('btn-od-upload').onclick     = async () => {
+  if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
+  document.getElementById('modal-settings').classList.add('hidden');
+  await odSyncAll();
+};
 
 document.getElementById('btn-onedrive').onclick = () => {
   updateOdUI();
@@ -2074,18 +2595,19 @@ document.getElementById('btn-onedrive').onclick = () => {
 
 document.getElementById('btn-delete-close').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-cancel').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
-document.getElementById('btn-delete-confirm').onclick = () => {
+document.getElementById('btn-delete-confirm').onclick = async () => {
   if (deleteTarget) {
     const idToDelete = deleteTarget;
     meetings = meetings.filter(m=>m.id!==idToDelete);
-    save();
-    if (odTokenData) odDeleteMeeting(idToDelete);
+    markMeetingDeleted(idToDelete);
+    persistStateLocally();
     selectedId=null;
     deleteTarget=null;
     document.getElementById('modal-delete').classList.add('hidden');
     renderSidebar();
     showView('empty');
     showToast('Reunião removida.', 'info');
+    odDeleteMeeting(idToDelete).catch(() => {});
   }
 };
 
@@ -2362,17 +2884,19 @@ function toggleSidebar() {
 
 document.getElementById('btn-ai-search').onclick = () => {
   document.getElementById('modal-ai-search').classList.remove('hidden');
-  document.getElementById('ai-search-input').focus();
+  setTimeout(() => document.getElementById('ai-search-input').focus(), 50);
 };
 document.getElementById('btn-ai-search-close').onclick  = () => document.getElementById('modal-ai-search').classList.add('hidden');
 document.getElementById('btn-ai-search-cancel').onclick = () => document.getElementById('modal-ai-search').classList.add('hidden');
-document.getElementById('btn-ai-search-send').onclick   = () => aiSearch(document.getElementById('ai-search-input').value);
-document.getElementById('ai-search-input').addEventListener('keydown', e => { if (e.key==='Enter') aiSearch(e.target.value); });
-document.querySelectorAll('[data-sq]').forEach(b => {
-  b.addEventListener('click', () => {
-    document.getElementById('ai-search-input').value = b.dataset.sq;
-    aiSearch(b.dataset.sq);
-  });
+document.getElementById('ai-search-input').addEventListener('input', runSearch);
+document.getElementById('ai-search-input').addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('modal-ai-search').classList.add('hidden'); });
+document.getElementById('search-filter-chips').addEventListener('click', e => {
+  const chip = e.target.closest('[data-sf]');
+  if (!chip) return;
+  searchFilter = chip.dataset.sf;
+  document.querySelectorAll('[data-sf]').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  runSearch();
 });
 document.getElementById('modal-ai-search').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-ai-search')) document.getElementById('modal-ai-search').classList.add('hidden');
