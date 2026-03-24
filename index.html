@@ -180,6 +180,23 @@
   .section-body { padding: 14px 18px; }
   .section-empty { color: var(--text3); font-size: 13px; font-style: italic; }
 
+
+  /* KICKOFF */
+  .kickoff-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .kickoff-block { background:#F8FAFC; border:1px solid var(--bg3); border-radius:10px; padding:14px; }
+  .kickoff-q { font-size:11px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .kickoff-a { font-size:15px; color:var(--text); line-height:1.55; }
+  .kickoff-a.empty { color:var(--text3); font-style:italic; }
+  .check-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .check-item { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--bg3); border-radius:10px; background:#F8FAFC; }
+  .check-item input { margin-top:3px; }
+  .check-item label { flex:1; font-size:14px; color:var(--text); cursor:pointer; }
+  .kickoff-service-list, .kickoff-insumo-list { display:grid; grid-template-columns:1fr; gap:8px; }
+  .parecer-option { border:1px solid var(--bg3); border-radius:12px; background:#F8FAFC; padding:12px 14px; }
+  .parecer-option.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(245,158,11,.18); }
+  .parecer-title { font-weight:700; font-size:14px; color:#1E293B; margin-bottom:4px; }
+  .parecer-desc { font-size:13px; color:var(--text2); line-height:1.5; }
+
   /* DETAIL */
   #detail-view { padding: 32px 40px; max-width: 860px; margin: 0 auto; }
   .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
@@ -684,6 +701,11 @@ body.dark .rt-editor { background:transparent !important; }
     text-align: center;
   }
 }
+
+  @media (max-width: 900px) {
+    .kickoff-grid, .check-grid { grid-template-columns: 1fr; }
+  }
+
 </style>
 </head>
 <body>
@@ -1572,6 +1594,92 @@ function stripHtml(s) {
   return String(s||'').replace(/<[^>]*>/g, ' ');
 }
 
+
+const KICKOFF_CANAIS = [
+  { value:'portal_cidadao', label:'Portal Cidadão' },
+  { value:'tridigitos', label:'Tridígitos' },
+  { value:'app_egdf', label:'App eGDF' },
+  { value:'whatsapp_passivo', label:'Whatsapp passivo (chat)' },
+  { value:'whatsapp_ativo', label:'Mensageria Whatsapp ativo' }
+];
+
+const KICKOFF_SERVICOS = [
+  'Mensageria por Whatsapp',
+  'Formulário no Portal Cidadão',
+  'Área de gestão dentro do Citysmart',
+  'Somente Mensageria em massa via whatsapp (periódicos ou sazonais)',
+  'Painel BI',
+  'Tridígitos'
+];
+
+const KICKOFF_INSUMOS = [
+  'Problema de negócio mapeado',
+  'Objetivo da solução definido',
+  'Público-alvo definido',
+  'Processo atual mapeado',
+  'Base de informações identificada',
+  'Necessidade de migração avaliada',
+  'Jornada do usuário descrita',
+  'Dependências com outros órgãos/áreas identificadas',
+  'Estimativa de volume informada',
+  'Canal preferencial definido',
+  'Prazo externo identificado'
+];
+
+const KICKOFF_PARECERES = [
+  {
+    value: 'aderente',
+    title: 'Aderente ao contrato',
+    desc: 'A demanda se enquadra inteiramente ao contrato Central IT. Encaminhar para a UGR.'
+  },
+  {
+    value: 'parcialmente_aderente',
+    title: 'Parcialmente Aderente',
+    desc: 'Envolve componente da Central de Relacionamento + componente da SUBSIS. Separar escopo.'
+  },
+  {
+    value: 'nao_aderente',
+    title: 'Não Aderente',
+    desc: 'A demanda é de back-office/área meio. Encaminhar para a SUBSIS (Decreto 40.015/2019, Art. 7º, III). Informar ao demandante, formalmente.'
+  }
+];
+
+function ensureKickoffData() {
+  if (!formData.kickoff || typeof formData.kickoff !== 'object') formData.kickoff = {};
+  if (!Array.isArray(formData.kickoff.insumos)) formData.kickoff.insumos = [];
+  if (!Array.isArray(formData.kickoff.servicos)) formData.kickoff.servicos = [];
+  return formData.kickoff;
+}
+
+function kickoffCanalLabel(value) {
+  return (KICKOFF_CANAIS.find(c => c.value === value) || {}).label || '';
+}
+
+function kickoffParecerMeta(value) {
+  return KICKOFF_PARECERES.find(p => p.value === value) || null;
+}
+
+function hasKickoffData(k) {
+  if (!k) return false;
+  return !!(
+    k.problema || k.objetivo || k.publicoAlvo || k.comoHoje || k.processoDefinido ||
+    k.baseInfos || k.migracaoDados || k.passoAPasso || k.envolverOutros || k.estimativaVolume ||
+    k.canalPreferido || k.possuiBaseConhecimento || k.prazoExterno ||
+    (k.insumos && k.insumos.length) || (k.servicos && k.servicos.length) || k.parecer
+  );
+}
+
+function renderKickoffValue(value, emptyText = 'Não informado') {
+  const v = String(value || '').trim();
+  return `<div class="kickoff-a${v ? '' : ' empty'}">${v ? escHtml(v).replace(/
+/g, '<br>') : escHtml(emptyText)}</div>`;
+}
+
+function renderKickoffChecklist(items, emptyText) {
+  if (!items || items.length === 0) return `<div class="section-empty">${escHtml(emptyText)}</div>`;
+  return `<div class="kickoff-service-list">${items.map(item => `<div class="check-item"><div style="font-size:16px;line-height:1">☑️</div><label>${escHtml(item)}</label></div>`).join('')}</div>`;
+}
+
 function sanitizeRichHtml(input) {
   const allowed = new Set(['B','STRONG','I','EM','U','BR','P','DIV','UL','OL','LI']);
   const tpl = document.createElement('template');
@@ -1697,6 +1805,52 @@ function renderDetail(m) {
         </div>
       </div>
     </div>
+
+    ${hasKickoffData(m.kickoff) ? `
+    <div class="section-card">
+      <div class="section-head">🚀 Módulo de Reunião Kick-off</div>
+      <div class="section-body">
+        <div class="kickoff-grid" style="margin-bottom:14px">
+          <div class="kickoff-block"><div class="kickoff-q">Qual o problema?</div>${renderKickoffValue(m.kickoff?.problema)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">O que pretendem resolver?</div>${renderKickoffValue(m.kickoff?.objetivo)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Qual é o público-alvo?</div>${renderKickoffValue(m.kickoff?.publicoAlvo)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Como está sendo feito até hoje? Ou não está?</div>${renderKickoffValue(m.kickoff?.comoHoje)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Qual o processo que a solução segue hoje? Está já bem definido esse processo?</div>${renderKickoffValue(m.kickoff?.processoDefinido)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Já possuem alguma base com informações? Algum dado precisa ser migrado para nossa base de dados?</div>${renderKickoffValue([m.kickoff?.baseInfos, m.kickoff?.migracaoDados].filter(Boolean).join('
+
+'))}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Qual o passo a passo, do ponto de vista de quem usa a solução?</div>${renderKickoffValue(m.kickoff?.passoAPasso)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Precisamos envolver outros órgãos ou áreas?</div>${renderKickoffValue(m.kickoff?.envolverOutros)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Qual a estimativa de volume (uso da solução)?</div>${renderKickoffValue(m.kickoff?.estimativaVolume)}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Canal preferido pelo órgão para a interface com o público-alvo</div>${renderKickoffValue(kickoffCanalLabel(m.kickoff?.canalPreferido))}</div>
+          ${(m.kickoff?.canalPreferido === 'tridigitos' || m.kickoff?.canalPreferido === 'whatsapp_passivo') ? `<div class="kickoff-block"><div class="kickoff-q">Possui base de conhecimento?</div>${renderKickoffValue(m.kickoff?.possuiBaseConhecimento)}</div>` : ''}
+          <div class="kickoff-block"><div class="kickoff-q">Há prazo externo que condicione a entrega?</div>${renderKickoffValue(m.kickoff?.prazoExterno)}</div>
+        </div>
+
+        <div class="grid2" style="align-items:start">
+          <div class="section-card" style="margin-bottom:0">
+            <div class="section-head">☑️ Insumos identificados</div>
+            <div class="section-body">${renderKickoffChecklist(m.kickoff?.insumos, 'Nenhum insumo marcado')}</div>
+          </div>
+          <div class="section-card" style="margin-bottom:0">
+            <div class="section-head">🛠️ Serviços a desenvolver</div>
+            <div class="section-body">${renderKickoffChecklist(m.kickoff?.servicos, 'Nenhum serviço selecionado')}</div>
+          </div>
+        </div>
+
+        <div class="section-card" style="margin-top:14px;margin-bottom:0">
+          <div class="section-head">🧭 Parecer da UTD</div>
+          <div class="section-body">
+            ${(() => {
+              const parecer = kickoffParecerMeta(m.kickoff?.parecer);
+              return parecer
+                ? `<div class="parecer-option active"><div class="parecer-title">${escHtml(parecer.title)}</div><div class="parecer-desc">${escHtml(parecer.desc)}</div></div>`
+                : '<div class="section-empty">Nenhum parecer selecionado</div>';
+            })()}
+          </div>
+        </div>
+      </div>
+    </div>` : ''}
 
     <div class="section-card">
       <div class="section-head" style="display:flex;justify-content:space-between;align-items:center">
@@ -1927,7 +2081,7 @@ function renderForm() {
       </div>
     </div>
     <div class="tabs">
-      ${[['geral','📋 Geral'],['pauta','📝 Pauta'],['participantes','👥 Participantes'],['encaminhamentos','✅ Encaminhamentos'],['documentos','📎 Documentos'],['referencias','🔗 Referências']].map(([k,l])=>`<button class="tab${formTab===k?' active':''}" data-tab="${k}">${l}</button>`).join('')}
+      ${[['geral','📋 Geral'],['pauta','📝 Pauta'],['kickoff','🚀 Kick-off'],['participantes','👥 Participantes'],['encaminhamentos','✅ Encaminhamentos'],['documentos','📎 Documentos'],['referencias','🔗 Referências']].map(([k,l])=>`<button class="tab${formTab===k?' active':''}" data-tab="${k}">${l}</button>`).join('')}
     </div>
     <div id="tab-content"></div>
   `;
@@ -2045,6 +2199,10 @@ function renderTabContent() {
     });
   }
 
+  else if (formTab === 'kickoff') {
+    renderKickoffTab(c);
+  }
+
   else if (formTab === 'participantes') {
     renderParticipantTab(c);
   }
@@ -2060,6 +2218,166 @@ function renderTabContent() {
   else if (formTab === 'referencias') {
     renderRefsTab(c);
   }
+}
+
+function renderKickoffTab(c) {
+  const kickoff = ensureKickoffData();
+  c.innerHTML = `
+    <div class="section-card">
+      <div class="section-head">🚀 Diagnóstico de Kick-off</div>
+      <div class="section-body">
+        <div class="kickoff-grid">
+          <div><label class="lbl">Qual o Problema?</label><textarea class="inp" id="ko-problema" rows="4" placeholder="Descreva o problema de negócio ou dor principal"></textarea></div>
+          <div><label class="lbl">O que pretendem resolver?</label><textarea class="inp" id="ko-objetivo" rows="4" placeholder="Resultado esperado com a solução"></textarea></div>
+          <div><label class="lbl">Qual é o público alvo?</label><textarea class="inp" id="ko-publico" rows="3" placeholder="Quem utilizará ou será impactado"></textarea></div>
+          <div><label class="lbl">Como está sendo feito até hoje? Ou não está?</label><textarea class="inp" id="ko-comohoje" rows="3" placeholder="Cenário atual, manual, planilha, e-mail, inexistente etc."></textarea></div>
+          <div><label class="lbl">Qual o processo que a solução segue hoje? Está já bem definido esse processo?</label><textarea class="inp" id="ko-processo" rows="4" placeholder="Fluxo atual e nível de definição do processo"></textarea></div>
+          <div><label class="lbl">Já possuem alguma base com informações?</label><textarea class="inp" id="ko-baseinfos" rows="4" placeholder="Bases existentes, origem, formato, qualidade dos dados"></textarea></div>
+          <div><label class="lbl">Algum dado precisa ser migrado para nossa base de dados?</label><textarea class="inp" id="ko-migracao" rows="3" placeholder="Quais dados, volume, histórico, integração"></textarea></div>
+          <div><label class="lbl">Qual o passo a passo, do ponto de vista de quem usa a solução?</label><textarea class="inp" id="ko-passoapasso" rows="4" placeholder="Jornada do usuário ponta a ponta"></textarea></div>
+          <div><label class="lbl">Precisamos envolver outros órgãos ou áreas?</label><textarea class="inp" id="ko-envolver" rows="3" placeholder="Dependências, parceiros, áreas internas e externas"></textarea></div>
+          <div><label class="lbl">Qual a estimativa de volume (uso da solução)?</label><textarea class="inp" id="ko-volume" rows="3" placeholder="Usuários, solicitações, mensagens, acessos, picos"></textarea></div>
+          <div>
+            <label class="lbl">Canal preferido pelo órgão para a interface com o público alvo</label>
+            <select class="inp" id="ko-canal">
+              <option value="">Selecione</option>
+              ${KICKOFF_CANAIS.map(canal => `<option value="${canal.value}"${kickoff.canalPreferido===canal.value?' selected':''}>${canal.label}</option>`).join('')}
+            </select>
+          </div>
+          <div id="ko-bc-wrap" style="display:${(kickoff.canalPreferido === 'tridigitos' || kickoff.canalPreferido === 'whatsapp_passivo') ? 'block' : 'none'}">
+            <label class="lbl">Possui base de conhecimento?</label>
+            <textarea class="inp" id="ko-baseconhecimento" rows="3" placeholder="Informe se há FAQ, base estruturada, conteúdo validado, fluxos de atendimento"></textarea>
+          </div>
+          <div style="grid-column:1 / -1">
+            <label class="lbl">Há prazo externo que condicione a entrega? (Legislação, decisão judicial, TCU etc.)</label>
+            <textarea class="inp" id="ko-prazo" rows="3" placeholder="Informe prazo, fundamento e criticidade"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2" style="align-items:start">
+      <div class="section-card">
+        <div class="section-head">☑️ Check-list dos insumos identificados</div>
+        <div class="section-body">
+          <div class="kickoff-insumo-list">
+            ${KICKOFF_INSUMOS.map((item, idx) => `
+              <div class="check-item">
+                <input type="checkbox" id="ko-insumo-${idx}" data-insumo="${escHtml(item)}" ${kickoff.insumos.includes(item) ? 'checked' : ''}/>
+                <label for="ko-insumo-${idx}">${item}</label>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">🛠️ Serviços que vamos desenvolver</div>
+        <div class="section-body">
+          <div class="kickoff-service-list">
+            ${KICKOFF_SERVICOS.map((item, idx) => `
+              <div class="check-item">
+                <input type="checkbox" id="ko-servico-${idx}" data-servico="${escHtml(item)}" ${kickoff.servicos.includes(item) ? 'checked' : ''}/>
+                <label for="ko-servico-${idx}">${item}</label>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">🧭 Parecer da UTD</div>
+      <div class="section-body">
+        <div style="display:grid;gap:10px">
+          ${KICKOFF_PARECERES.map((item, idx) => `
+            <label class="parecer-option ${kickoff.parecer===item.value?'active':''}" for="ko-parecer-${idx}">
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <input type="radio" name="ko-parecer" id="ko-parecer-${idx}" value="${item.value}" ${kickoff.parecer===item.value?'checked':''} style="margin-top:3px"/>
+                <div>
+                  <div class="parecer-title">${item.title}</div>
+                  <div class="parecer-desc">${item.desc}</div>
+                </div>
+              </div>
+            </label>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const bind = (selector, key) => {
+    const el = c.querySelector(selector);
+    if (!el) return;
+    el.value = kickoff[key] || '';
+    el.addEventListener('input', e => { kickoff[key] = e.target.value; });
+  };
+
+  bind('#ko-problema', 'problema');
+  bind('#ko-objetivo', 'objetivo');
+  bind('#ko-publico', 'publicoAlvo');
+  bind('#ko-comohoje', 'comoHoje');
+  bind('#ko-processo', 'processoDefinido');
+  bind('#ko-baseinfos', 'baseInfos');
+  bind('#ko-migracao', 'migracaoDados');
+  bind('#ko-passoapasso', 'passoAPasso');
+  bind('#ko-envolver', 'envolverOutros');
+  bind('#ko-volume', 'estimativaVolume');
+  bind('#ko-prazo', 'prazoExterno');
+  const bc = c.querySelector('#ko-baseconhecimento');
+  if (bc) {
+    bc.value = kickoff.possuiBaseConhecimento || '';
+    bc.addEventListener('input', e => { kickoff.possuiBaseConhecimento = e.target.value; });
+  }
+
+  const canal = c.querySelector('#ko-canal');
+  canal.addEventListener('change', e => {
+    kickoff.canalPreferido = e.target.value;
+    const wrap = c.querySelector('#ko-bc-wrap');
+    const show = kickoff.canalPreferido === 'tridigitos' || kickoff.canalPreferido === 'whatsapp_passivo';
+    wrap.style.display = show ? 'block' : 'none';
+    if (show) {
+      const bcEl = c.querySelector('#ko-baseconhecimento');
+      if (bcEl && !bcEl.value && kickoff.possuiBaseConhecimento) bcEl.value = kickoff.possuiBaseConhecimento;
+      if (bcEl && !bcEl.dataset.bound) {
+        bcEl.addEventListener('input', ev => { kickoff.possuiBaseConhecimento = ev.target.value; });
+        bcEl.dataset.bound = '1';
+      }
+    } else {
+      kickoff.possuiBaseConhecimento = '';
+      const bcEl = c.querySelector('#ko-baseconhecimento');
+      if (bcEl) bcEl.value = '';
+    }
+  });
+
+  c.querySelectorAll('[data-insumo]').forEach(el => {
+    el.addEventListener('change', e => {
+      const value = e.target.getAttribute('data-insumo');
+      kickoff.insumos = kickoff.insumos || [];
+      if (e.target.checked) {
+        if (!kickoff.insumos.includes(value)) kickoff.insumos.push(value);
+      } else {
+        kickoff.insumos = kickoff.insumos.filter(item => item !== value);
+      }
+    });
+  });
+
+  c.querySelectorAll('[data-servico]').forEach(el => {
+    el.addEventListener('change', e => {
+      const value = e.target.getAttribute('data-servico');
+      kickoff.servicos = kickoff.servicos || [];
+      if (e.target.checked) {
+        if (!kickoff.servicos.includes(value)) kickoff.servicos.push(value);
+      } else {
+        kickoff.servicos = kickoff.servicos.filter(item => item !== value);
+      }
+    });
+  });
+
+  c.querySelectorAll('input[name="ko-parecer"]').forEach(el => {
+    el.addEventListener('change', e => {
+      kickoff.parecer = e.target.value;
+      c.querySelectorAll('.parecer-option').forEach(card => card.classList.remove('active'));
+      e.target.closest('.parecer-option')?.classList.add('active');
+    });
+  });
 }
 
 function renderParticipantTab(c) {
