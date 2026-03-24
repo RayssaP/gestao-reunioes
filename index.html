@@ -252,6 +252,22 @@
   .doc-name { font-size: 14px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .doc-desc { font-size: 12px; color: var(--text3); }
 
+  /* RICH TEXT */
+  .rt-wrap { border:1px solid var(--bg3); border-radius:10px; overflow:hidden; background:#F8FAFC; }
+  .rt-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); }
+  .rt-btn { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--bg3); border-radius:8px; background:var(--bg2); color:var(--text2); font-size:13px; font-family:var(--font-mono); }
+  .rt-btn:hover { background:var(--bg3); }
+  .rt-editor { min-height:150px; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; }
+  .rt-editor[data-placeholder]:empty:before { content: attr(data-placeholder); color: var(--text3); }
+  .rt-editor ul, .rt-editor ol { padding-left: 22px; margin: 8px 0; }
+  .rt-editor p { margin: 0 0 10px; }
+  .rt-editor p:last-child { margin-bottom: 0; }
+  .rich-content { font-size:15px; line-height:1.8; color:#475569; }
+  .rich-content ul, .rich-content ol { padding-left: 22px; margin: 8px 0; }
+  .rich-content p { margin: 0 0 10px; }
+  .rich-content p:last-child { margin-bottom: 0; }
+
+
   /* DASHBOARD */
   .dash { padding: 32px 40px; max-width: 960px; margin: 0 auto; overflow-y: auto; }
   .dash-greeting { margin-bottom: 28px; }
@@ -1521,6 +1537,76 @@ function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function stripHtml(s) {
+  return String(s||'').replace(/<[^>]*>/g, ' ');
+}
+
+function sanitizeRichHtml(input) {
+  const allowed = new Set(['B','STRONG','I','EM','U','BR','P','DIV','UL','OL','LI']);
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(input || '');
+  const clean = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent || '');
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createTextNode('');
+    const tag = node.tagName.toUpperCase();
+    if (!allowed.has(tag)) {
+      const frag = document.createDocumentFragment();
+      Array.from(node.childNodes).forEach(child => frag.appendChild(clean(child)));
+      return frag;
+    }
+    const el = document.createElement(tag.toLowerCase());
+    Array.from(node.childNodes).forEach(child => el.appendChild(clean(child)));
+    return el;
+  };
+  const out = document.createElement('div');
+  Array.from(tpl.content.childNodes).forEach(child => out.appendChild(clean(child)));
+  return out.innerHTML
+    .replace(/<div>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+    .replace(/<p>(\s|&nbsp;|<br>)*<\/p>/gi, '')
+    .trim();
+}
+
+function plainToRichHtml(text) {
+  const value = String(text || '');
+  if (!value.trim()) return '';
+  if (/<\/?[a-z][\s\S]*>/i.test(value)) return sanitizeRichHtml(value);
+  return value
+    .split(/\n{2,}/)
+    .map(part => `<p>${escHtml(part).replace(/\n/g,'<br>')}</p>`)
+    .join('');
+}
+
+function renderRichContent(value, emptyText) {
+  const rich = plainToRichHtml(value);
+  return rich ? `<div class="rich-content">${rich}</div>` : `<div class="section-empty">${emptyText}</div>`;
+}
+
+function bindRichEditor(container, editorId, initialValue, onChange) {
+  const editor = container.querySelector('#' + editorId);
+  if (!editor) return;
+  editor.innerHTML = plainToRichHtml(initialValue);
+  const sync = () => { onChange(sanitizeRichHtml(editor.innerHTML)); };
+  editor.addEventListener('input', sync);
+  container.querySelectorAll(`[data-editor="${editorId}"]`).forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      editor.focus();
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'clear') {
+        document.execCommand('removeFormat');
+        document.execCommand('formatBlock', false, 'p');
+      } else if (cmd === 'paragraph') {
+        document.execCommand('formatBlock', false, 'p');
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+      sync();
+    });
+  });
+}
+
+
 function selectMeeting(id) {
   selectedId = id;
   const m = meetings.find(m=>m.id===id);
@@ -1567,11 +1653,11 @@ function renderDetail(m) {
     <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
-        <div class="section-body">${m.agenda?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
+        <div class="section-body">${renderRichContent(m.agenda, 'Nenhuma pauta registrada')}</div>
       </div>
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📝 Anotações e Discussões</div>
-        <div class="section-body">${m.notes?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.notes)}</div>`:'<div class="section-empty">Nenhuma anotação</div>'}</div>
+        <div class="section-body">${renderRichContent(m.notes, 'Nenhuma anotação')}</div>
       </div>
     </div>
 
@@ -1863,15 +1949,37 @@ function renderTabContent() {
     c.innerHTML = `
       <div style="margin-bottom:16px">
         <label class="lbl">Pauta / Objetivos</label>
-        <textarea class="inp" id="f-agenda" rows="6" placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia...">${escHtml(formData.agenda||'')}</textarea>
+        <div class="rt-wrap">
+          <div class="rt-toolbar">
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="bold"><strong>B</strong></button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="italic"><em>I</em></button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="underline"><u>U</u></button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="insertUnorderedList">• Lista</button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="insertOrderedList">1. Lista</button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="paragraph">¶</button>
+            <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="clear">Limpar</button>
+          </div>
+          <div class="rt-editor" id="f-agenda" contenteditable="true" data-placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia..."></div>
+        </div>
       </div>
       <div>
         <label class="lbl">Anotações e Discussões</label>
-        <textarea class="inp" id="f-notes" rows="8" placeholder="Registre as discussões, decisões tomadas e observações...">${escHtml(formData.notes||'')}</textarea>
+        <div class="rt-wrap">
+          <div class="rt-toolbar">
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="bold"><strong>B</strong></button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="italic"><em>I</em></button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="underline"><u>U</u></button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="insertUnorderedList">• Lista</button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="insertOrderedList">1. Lista</button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="paragraph">¶</button>
+            <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="clear">Limpar</button>
+          </div>
+          <div class="rt-editor" id="f-notes" contenteditable="true" data-placeholder="Registre as discussões, decisões tomadas e observações..."></div>
+        </div>
       </div>
     `;
-    c.querySelector('#f-agenda').oninput = e => { formData.agenda = e.target.value; };
-    c.querySelector('#f-notes').oninput = e => { formData.notes = e.target.value; };
+    bindRichEditor(c, 'f-agenda', formData.agenda || '', value => { formData.agenda = value; });
+    bindRichEditor(c, 'f-notes', formData.notes || '', value => { formData.notes = value; });
   }
 
   else if (formTab === 'participantes') {
@@ -2453,7 +2561,7 @@ function runSearch() {
   const results = meetings.map(m => {
     const fields = {
       titulo:          (m.title || '').toLowerCase(),
-      pauta:           ((m.agenda || '') + ' ' + (m.notes || '')).toLowerCase(),
+      pauta:           (stripHtml(m.agenda || '') + ' ' + stripHtml(m.notes || '')).toLowerCase(),
       participantes:   (m.participants || []).map(p => [p.name, p.org, p.email, p.phone].filter(Boolean).join(' ')).join(' ').toLowerCase(),
       encaminhamentos: (m.actions || []).map(a => [a.text, a.responsible].filter(Boolean).join(' ')).join(' ').toLowerCase(),
       data:            (m.date || '') + ' ' + fmtDate(m.date).toLowerCase(),
@@ -2469,7 +2577,7 @@ function runSearch() {
       if (fields.titulo.includes(q)) matches.push({ label: 'Título', text: m.title || '' });
     }
     if (searchFilter === 'todos' || searchFilter === 'pauta') {
-      const combined = (m.agenda || '') + (m.notes ? '\n' + m.notes : '');
+      const combined = stripHtml(m.agenda || '') + (m.notes ? '\n' + stripHtml(m.notes) : '');
       if (fields.pauta.includes(q)) {
         const idx = fields.pauta.indexOf(q);
         const snippet = combined.slice(Math.max(0, idx-40), idx+80).replace(/\n/g,' ');
@@ -2635,7 +2743,7 @@ function renderDashboard() {
   const stopwords = new Set(['de','a','o','e','em','para','da','do','com','que','uma','um','as','os','por','se','na','no','ao','não','é','como','sua','seu','mais','ser','dos','das','foram','para','esta','este','isso','essa','esse']);
   const wordCount = {};
   meetings.forEach(m => {
-    const text = ((m.title||'') + ' ' + (m.agenda||'')).toLowerCase();
+    const text = ((m.title||'') + ' ' + stripHtml(m.agenda||'')).toLowerCase();
     text.replace(/[^a-záàãâéêíóôõúüçñ\s]/gi,'').split(/\s+/).forEach(w => {
       if (w.length > 3 && !stopwords.has(w)) wordCount[w] = (wordCount[w]||0) + 1;
     });
