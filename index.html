@@ -1671,8 +1671,7 @@ function hasKickoffData(k) {
 
 function renderKickoffValue(value, emptyText = 'Não informado') {
   const v = String(value || '').trim();
-  return `<div class="kickoff-a${v ? '' : ' empty'}">${v ? escHtml(v).replace(/
-/g, '<br>') : escHtml(emptyText)}</div>`;
+  return `<div class="kickoff-a${v ? '' : ' empty'}">${v ? escHtml(v).replace(/\n/g, '<br>') : escHtml(emptyText)}</div>`;
 }
 
 function renderKickoffChecklist(items, emptyText) {
@@ -1816,9 +1815,7 @@ function renderDetail(m) {
           <div class="kickoff-block"><div class="kickoff-q">Qual é o público-alvo?</div>${renderKickoffValue(m.kickoff?.publicoAlvo)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Como está sendo feito até hoje? Ou não está?</div>${renderKickoffValue(m.kickoff?.comoHoje)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Qual o processo que a solução segue hoje? Está já bem definido esse processo?</div>${renderKickoffValue(m.kickoff?.processoDefinido)}</div>
-          <div class="kickoff-block"><div class="kickoff-q">Já possuem alguma base com informações? Algum dado precisa ser migrado para nossa base de dados?</div>${renderKickoffValue([m.kickoff?.baseInfos, m.kickoff?.migracaoDados].filter(Boolean).join('
-
-'))}</div>
+          <div class="kickoff-block"><div class="kickoff-q">Já possuem alguma base com informações? Algum dado precisa ser migrado para nossa base de dados?</div>${renderKickoffValue([m.kickoff?.baseInfos, m.kickoff?.migracaoDados].filter(Boolean).join('\n\n'))}</div>
           <div class="kickoff-block"><div class="kickoff-q">Qual o passo a passo, do ponto de vista de quem usa a solução?</div>${renderKickoffValue(m.kickoff?.passoAPasso)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Precisamos envolver outros órgãos ou áreas?</div>${renderKickoffValue(m.kickoff?.envolverOutros)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Qual a estimativa de volume (uso da solução)?</div>${renderKickoffValue(m.kickoff?.estimativaVolume)}</div>
