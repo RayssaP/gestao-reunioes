@@ -1648,11 +1648,29 @@ function ensureKickoffData() {
   if (!formData.kickoff || typeof formData.kickoff !== 'object') formData.kickoff = {};
   if (!Array.isArray(formData.kickoff.insumos)) formData.kickoff.insumos = [];
   if (!Array.isArray(formData.kickoff.servicos)) formData.kickoff.servicos = [];
+  if (!Array.isArray(formData.kickoff.canaisPreferidos)) {
+    const legacy = formData.kickoff.canalPreferido ? [formData.kickoff.canalPreferido] : [];
+    formData.kickoff.canaisPreferidos = legacy;
+  }
+  if (!formData.kickoff.canalPreferido && formData.kickoff.canaisPreferidos[0]) {
+    formData.kickoff.canalPreferido = formData.kickoff.canaisPreferidos[0];
+  }
   return formData.kickoff;
 }
 
 function kickoffCanalLabel(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map(v => (KICKOFF_CANAIS.find(c => c.value === v) || {}).label || '')
+      .filter(Boolean)
+      .join(', ');
+  }
   return (KICKOFF_CANAIS.find(c => c.value === value) || {}).label || '';
+}
+
+function kickoffHasBaseKnowledgeChannel(value) {
+  const canais = Array.isArray(value) ? value : (value ? [value] : []);
+  return canais.includes('tridigitos') || canais.includes('whatsapp_passivo');
 }
 
 function kickoffParecerMeta(value) {
@@ -1664,7 +1682,7 @@ function hasKickoffData(k) {
   return !!(
     k.problema || k.objetivo || k.publicoAlvo || k.comoHoje || k.processoDefinido ||
     k.baseInfos || k.migracaoDados || k.passoAPasso || k.envolverOutros || k.estimativaVolume ||
-    k.canalPreferido || k.possuiBaseConhecimento || k.prazoExterno ||
+    (k.canaisPreferidos && k.canaisPreferidos.length) || k.canalPreferido || k.possuiBaseConhecimento || k.prazoExterno ||
     (k.insumos && k.insumos.length) || (k.servicos && k.servicos.length) || k.parecer
   );
 }
@@ -1819,8 +1837,8 @@ function renderDetail(m) {
           <div class="kickoff-block"><div class="kickoff-q">Qual o passo a passo, do ponto de vista de quem usa a solução?</div>${renderKickoffValue(m.kickoff?.passoAPasso)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Precisamos envolver outros órgãos ou áreas?</div>${renderKickoffValue(m.kickoff?.envolverOutros)}</div>
           <div class="kickoff-block"><div class="kickoff-q">Qual a estimativa de volume (uso da solução)?</div>${renderKickoffValue(m.kickoff?.estimativaVolume)}</div>
-          <div class="kickoff-block"><div class="kickoff-q">Canal preferido pelo órgão para a interface com o público-alvo</div>${renderKickoffValue(kickoffCanalLabel(m.kickoff?.canalPreferido))}</div>
-          ${(m.kickoff?.canalPreferido === 'tridigitos' || m.kickoff?.canalPreferido === 'whatsapp_passivo') ? `<div class="kickoff-block"><div class="kickoff-q">Possui base de conhecimento?</div>${renderKickoffValue(m.kickoff?.possuiBaseConhecimento)}</div>` : ''}
+          <div class="kickoff-block"><div class="kickoff-q">Canal preferido pelo órgão para a interface com o público-alvo</div>${renderKickoffValue(kickoffCanalLabel(m.kickoff?.canaisPreferidos || m.kickoff?.canalPreferido))}</div>
+          ${kickoffHasBaseKnowledgeChannel(m.kickoff?.canaisPreferidos || m.kickoff?.canalPreferido) ? `<div class="kickoff-block"><div class="kickoff-q">Possui base de conhecimento?</div>${renderKickoffValue(m.kickoff?.possuiBaseConhecimento)}</div>` : ''}
           <div class="kickoff-block"><div class="kickoff-q">Há prazo externo que condicione a entrega?</div>${renderKickoffValue(m.kickoff?.prazoExterno)}</div>
         </div>
 
@@ -2235,13 +2253,16 @@ function renderKickoffTab(c) {
           <div><label class="lbl">Precisamos envolver outros órgãos ou áreas?</label><textarea class="inp" id="ko-envolver" rows="3" placeholder="Dependências, parceiros, áreas internas e externas"></textarea></div>
           <div><label class="lbl">Qual a estimativa de volume (uso da solução)?</label><textarea class="inp" id="ko-volume" rows="3" placeholder="Usuários, solicitações, mensagens, acessos, picos"></textarea></div>
           <div>
-            <label class="lbl">Canal preferido pelo órgão para a interface com o público alvo</label>
-            <select class="inp" id="ko-canal">
-              <option value="">Selecione</option>
-              ${KICKOFF_CANAIS.map(canal => `<option value="${canal.value}"${kickoff.canalPreferido===canal.value?' selected':''}>${canal.label}</option>`).join('')}
-            </select>
+            <label class="lbl">Canal preferido pelo órgão para a interface com o público alvo ?</label>
+            <div class="kickoff-checkgroup" id="ko-canais-wrap">
+              ${KICKOFF_CANAIS.map((canal, idx) => `
+                <label class="check-item" for="ko-canal-${idx}">
+                  <input type="checkbox" id="ko-canal-${idx}" data-canal="${canal.value}" ${kickoff.canaisPreferidos.includes(canal.value) ? 'checked' : ''}/>
+                  <span>${canal.label}</span>
+                </label>`).join('')}
+            </div>
           </div>
-          <div id="ko-bc-wrap" style="display:${(kickoff.canalPreferido === 'tridigitos' || kickoff.canalPreferido === 'whatsapp_passivo') ? 'block' : 'none'}">
+          <div id="ko-bc-wrap" style="display:${kickoffHasBaseKnowledgeChannel(kickoff.canaisPreferidos) ? 'block' : 'none'}">
             <label class="lbl">Possui base de conhecimento?</label>
             <textarea class="inp" id="ko-baseconhecimento" rows="3" placeholder="Informe se há FAQ, base estruturada, conteúdo validado, fluxos de atendimento"></textarea>
           </div>
@@ -2324,11 +2345,10 @@ function renderKickoffTab(c) {
     bc.addEventListener('input', e => { kickoff.possuiBaseConhecimento = e.target.value; });
   }
 
-  const canal = c.querySelector('#ko-canal');
-  canal.addEventListener('change', e => {
-    kickoff.canalPreferido = e.target.value;
+  const updateBaseConhecimentoVisibility = () => {
+    kickoff.canalPreferido = (kickoff.canaisPreferidos && kickoff.canaisPreferidos[0]) || '';
     const wrap = c.querySelector('#ko-bc-wrap');
-    const show = kickoff.canalPreferido === 'tridigitos' || kickoff.canalPreferido === 'whatsapp_passivo';
+    const show = kickoffHasBaseKnowledgeChannel(kickoff.canaisPreferidos);
     wrap.style.display = show ? 'block' : 'none';
     if (show) {
       const bcEl = c.querySelector('#ko-baseconhecimento');
@@ -2342,7 +2362,22 @@ function renderKickoffTab(c) {
       const bcEl = c.querySelector('#ko-baseconhecimento');
       if (bcEl) bcEl.value = '';
     }
+  };
+
+  c.querySelectorAll('[data-canal]').forEach(el => {
+    el.addEventListener('change', e => {
+      const value = e.target.getAttribute('data-canal');
+      kickoff.canaisPreferidos = kickoff.canaisPreferidos || [];
+      if (e.target.checked) {
+        if (!kickoff.canaisPreferidos.includes(value)) kickoff.canaisPreferidos.push(value);
+      } else {
+        kickoff.canaisPreferidos = kickoff.canaisPreferidos.filter(item => item !== value);
+      }
+      updateBaseConhecimentoVisibility();
+    });
   });
+
+  updateBaseConhecimentoVisibility();
 
   c.querySelectorAll('[data-insumo]').forEach(el => {
     el.addEventListener('change', e => {
