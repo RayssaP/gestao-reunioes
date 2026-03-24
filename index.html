@@ -322,7 +322,7 @@
     background: none; border: none; padding: 6px; cursor: pointer;
     width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
   }
-  @media (max-width: 768px) { .btn-hamburger { display: flex; } }
+  @media (max-width: 1024px) { .btn-hamburger { display: flex; } }
   .btn-hamburger span {
     display: block; width: 20px; height: 2px;
     background: var(--text2); border-radius: 2px; transition: all 0.25s;
@@ -349,7 +349,42 @@
     .modal      { min-width: 360px; }
   }
 
-  /* ── TABLET PORTRAIT  ≤ 768px ── */
+  /* ── TABLET PORTRAIT  769px–1024px — sidebar como drawer, conteúdo tela cheia ── */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    /* Sidebar vira drawer sobreposto */
+    #sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 300px; min-width: 0;
+      z-index: 200;
+      transform: translateX(-100%);
+      transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+      box-shadow: 4px 0 28px rgba(0,0,0,0.18);
+    }
+    #sidebar.open  { transform: translateX(0); }
+    #sidebar-overlay { z-index: 199; }
+
+    /* Main ocupa largura total */
+    #main    { overflow: hidden; }
+    #content { overflow-y: auto; flex: 1; }
+
+    /* Views em altura total */
+    #view-empty  { height: calc(100vh - 64px); }
+    #view-detail { overflow-y: auto; height: calc(100vh - 64px); }
+    #view-form   { overflow-y: auto; height: calc(100vh - 64px); }
+
+    /* Padding confortável para tablet */
+    .dash        { padding: 24px 32px 60px; }
+    #detail-view { padding: 24px 32px 60px; max-width: 100%; }
+    #form-view   { padding: 22px 32px 60px; max-width: 100%; }
+
+    /* Grids tablet portrait */
+    .kpi-grid  { grid-template-columns: repeat(2, 1fr); }
+    .dash-row  { grid-template-columns: 1fr; gap: 14px; }
+    .dash-row3 { grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid2     { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── MOBILE  ≤ 768px ── */
   @media (max-width: 768px) {
     /* Header — duas linhas no mobile */
     #header {
@@ -724,12 +759,13 @@
             <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">🔄 Sincronizar com o Drive</button>
+            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">⬇️ Buscar do Drive</button>
             <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
           </div>
           <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
-            🔄 <strong>Sincronizar com o Drive</strong> — localiza o JSON mais recente, mesmo que a pasta tenha mudado, atualiza os dados locais e mantém o mesmo arquivo no Drive
+            ⬇️ <strong>Buscar do Drive</strong> — substitui os dados locais pelos do Drive<br>
+            ⬆️ <strong>Enviar ao Drive</strong> — substitui os dados do Drive pelos locais
           </div>
         </div>
 
@@ -990,7 +1026,13 @@ async function ensureGoogleAccess(interactive = false) {
     });
   }
   return await new Promise((resolve, reject) => {
+    // Timeout: se a renovação silenciosa travar (comum em mobile), rejeita após 8s
+    const timeout = interactive ? null : setTimeout(() => {
+      reject(new Error('TOKEN_TIMEOUT'));
+    }, 8000);
+
     googleTokenClient.callback = async (resp) => {
+      if (timeout) clearTimeout(timeout);
       if (resp?.error) { reject(new Error(resp.error)); return; }
       if (!resp?.access_token) { reject(new Error('Google não retornou token de acesso.')); return; }
       const expiresIn = Number(resp.expires_in || 3600);
@@ -1001,7 +1043,7 @@ async function ensureGoogleAccess(interactive = false) {
     };
     try {
       googleTokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
-    } catch (e) { reject(e); }
+    } catch (e) { if (timeout) clearTimeout(timeout); reject(e); }
   });
 }
 
@@ -1010,44 +1052,40 @@ async function odAccessToken(interactive = false) {
 }
 
 async function gfetch(url, opts = {}) {
-  const token = await odAccessToken(false);
+  // Garante token válido antes de cada chamada
+  let token;
+  try {
+    token = await odAccessToken(false);
+  } catch(e) {
+    // Renovação silenciosa falhou — marca sync como pendente e avisa
+    if (e.message === 'TOKEN_TIMEOUT' || e.message?.includes('token')) {
+      settings.syncPending = true;
+      saveSettings();
+      setOdStatus('err', 'Reconectar');
+      throw new Error('Sessão expirada. Clique em "Drive" no cabeçalho e reconecte para sincronizar.');
+    }
+    throw e;
+  }
   const res = await fetch(url, {
     ...opts,
     headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) }
   });
   if (res.status === 401 && !opts.__retried) {
-    await ensureGoogleAccess(true);
-    return gfetch(url, { ...opts, __retried: true });
+    // Token rejeitado pelo servidor — limpa e pede reconexão
+    odClearTokens();
+    settings.syncPending = true;
+    saveSettings();
+    setOdStatus('err', 'Reconectar');
+    updateOdUI();
+    throw new Error('Sessão expirada. Clique em "Drive" e faça login novamente.');
   }
   return res;
 }
 
-async function gdGetFileById(fileId) {
-  if (!fileId) return null;
-  const r = await gfetch(`${DRIVE_API}/files/${fileId}?fields=id,name,parents,trashed`);
-  if (!r.ok) return null;
-  const data = await r.json();
-  if (!data || data.trashed) return null;
-  return data;
-}
-
-async function gdGetFolderById(folderId) {
-  if (!folderId) return null;
-  const r = await gfetch(`${DRIVE_API}/files/${folderId}?fields=id,name,mimeType,trashed`);
-  if (!r.ok) return null;
-  const data = await r.json();
-  if (!data || data.trashed || data.mimeType !== 'application/vnd.google-apps.folder') return null;
-  return data;
-}
-
 async function gdFindFolder() {
-  const cached = await gdGetFolderById(settings.gdFolderId);
-  if (cached) return cached.id;
-  delete settings.gdFolderId;
-  saveSettings();
-
+  if (settings.gdFolderId) return settings.gdFolderId;
   const q = encodeURIComponent(`name='${GD_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime desc&pageSize=10`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
   if (!r.ok) throw new Error('Falha ao localizar pasta no Drive.');
   const data = await r.json();
   const id = data.files?.[0]?.id || null;
@@ -1070,29 +1108,15 @@ async function ensureFolder() {
   return data.id;
 }
 
-async function gdFindDataFile() {
-  const cached = await gdGetFileById(settings.gdFileId);
-  if (cached && cached.name === GD_FILENAME) {
-    settings.gdFolderId = cached.parents?.[0] || settings.gdFolderId;
-    saveSettings();
-    return cached.id;
-  }
-  delete settings.gdFileId;
-  saveSettings();
-
-  const q = encodeURIComponent(`name='${GD_FILENAME}' and trashed=false`);
-  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,parents,modifiedTime)&orderBy=modifiedTime desc&pageSize=20`);
+async function gdFindDataFile(folderId) {
+  if (settings.gdFileId) return settings.gdFileId;
+  const q = encodeURIComponent(`name='${GD_FILENAME}' and '${folderId}' in parents and trashed=false`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
   if (!r.ok) throw new Error('Falha ao localizar arquivo principal no Drive.');
   const data = await r.json();
-  const files = data.files || [];
-  if (!files.length) return null;
-
-  const preferredFolderId = settings.gdFolderId;
-  const chosen = files.find(f => preferredFolderId && Array.isArray(f.parents) && f.parents.includes(preferredFolderId)) || files[0];
-  settings.gdFileId = chosen.id;
-  if (chosen.parents?.[0]) settings.gdFolderId = chosen.parents[0];
-  saveSettings();
-  return chosen.id;
+  const id = data.files?.[0]?.id || null;
+  if (id) { settings.gdFileId = id; saveSettings(); }
+  return id;
 }
 
 async function uploadDriveJson(fileId, folderId, payloadObj) {
@@ -1137,9 +1161,8 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
 }
  
 async function odSaveIndex() {
-  let fileId = await gdFindDataFile();
-  let folderId = settings.gdFolderId || null;
-  if (!folderId) folderId = await ensureFolder();
+  const folderId = await ensureFolder();
+  const fileId = await gdFindDataFile(folderId);
   await uploadDriveJson(fileId, folderId, {
     version: 1,
     updatedAt: new Date().toISOString(),
@@ -1183,6 +1206,7 @@ async function odSyncAll() {
   try {
     await odSaveIndex();
     settings.odLastSync = new Date().toISOString();
+    settings.syncPending = false;
     saveSettings();
     setOdStatus('on', 'Drive ✓');
     updateLastSync();
@@ -1196,9 +1220,9 @@ async function odSyncAll() {
 async function odLoadAll() {
   setOdStatus('syncing', 'Baixando…');
   try {
-    const fileId = await gdFindDataFile();
+    const folderId = await ensureFolder();
+    const fileId = await gdFindDataFile(folderId);
     if (!fileId) {
-      const folderId = await ensureFolder();
       await odSyncAll();
       return;
     }
@@ -1257,8 +1281,17 @@ async function odConnect() {
     codeBox.style.display = 'none';
     updateOdUI();
     document.getElementById('modal-settings').classList.add('hidden');
-    showToast('✅ Google Drive conectado! Carregando reuniões…');
-    await odLoadAll();
+
+    // Se há dados pendentes para enviar (editados offline), envia primeiro
+    if (settings.syncPending) {
+      showToast('🔄 Reconectado! Enviando alterações pendentes ao Drive…');
+      await odSyncAll();
+      settings.syncPending = false;
+      saveSettings();
+    } else {
+      showToast('✅ Google Drive conectado! Carregando reuniões…');
+      await odLoadAll();
+    }
   } catch (e) {
     codeBox.style.display = 'none';
     setupArea.style.display = 'block';
@@ -1306,9 +1339,14 @@ function updateOdUI() {
     if (ne) ne.textContent = odUserInfo?.name || 'Conta Google';
     if (ee) ee.textContent = odUserInfo?.email || '—';
     updateLastSync();
-    setOdStatus('on', 'Drive ✓');
+    // Mostra indicador de pendente se houver alterações não sincronizadas
+    if (settings.syncPending) {
+      setOdStatus('err', 'Drive ⚠️');
+    } else {
+      setOdStatus('on', 'Drive ✓');
+    }
   } else {
-    setOdStatus('off', 'Drive');
+    setOdStatus('off', settings.syncPending ? 'Drive ⚠️' : 'Drive');
     const inp = document.getElementById('od-client-id-input');
     if (inp && settings.odClientId) inp.value = settings.odClientId;
   }
@@ -1647,7 +1685,7 @@ function renderDetail(m) {
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
       localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-      if (odTokenData) odSaveMeeting(meeting);
+      if (hasValidGoogleToken()) odSaveMeeting(meeting);
       renderSidebar();
       renderDetail(meeting);
     });
@@ -1677,7 +1715,7 @@ function renderDetail(m) {
           phone: document.getElementById('edit-p-phone').value.trim()
         };
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
+        if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1688,7 +1726,7 @@ function renderDetail(m) {
         if (!confirm(`Remover "${p.name}" da reunião?`)) return;
         meeting.participants.splice(idx, 1);
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
+        if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -1719,7 +1757,7 @@ function renderDetail(m) {
           done:        document.getElementById('edit-action-done').checked
         };
         localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-        if (odTokenData) odSaveMeeting(meeting);
+        if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-action').classList.add('hidden');
         renderSidebar();
         renderDetail(meeting);
@@ -2053,12 +2091,18 @@ function saveForm() {
     selectedId = formData.id;
   }
   save();
-  if (odTokenData) odSaveMeeting(formData);
+  if (hasValidGoogleToken()) {
+    odSaveMeeting(formData);
+    showToast('Reunião salva com sucesso!');
+  } else {
+    settings.syncPending = true;
+    saveSettings();
+    showToast('💾 Salvo localmente. Reconecte ao Drive para sincronizar.', 'info');
+  }
   renderSidebar();
   const m = meetings.find(m=>m.id===selectedId);
   if (m) renderDetail(m);
   showView('detail');
-  showToast('Reunião salva com sucesso!');
 }
 
 // ===== DASHBOARD =====
@@ -2510,7 +2554,7 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 
 document.getElementById('btn-od-connect').onclick    = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
-document.getElementById('btn-od-sync-now').onclick   = async () => { await odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
+document.getElementById('btn-od-sync-now').onclick   = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
 document.getElementById('btn-od-upload').onclick     = async () => {
   if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
   document.getElementById('modal-settings').classList.add('hidden');
@@ -2798,7 +2842,7 @@ function renderDashboard() {
 }
 
 // ===== RESPONSIVE SIDEBAR =====
-function isMobile() { return window.innerWidth <= 768; }
+function isMobile() { return window.innerWidth <= 1024; }
 
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
