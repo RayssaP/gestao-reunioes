@@ -264,6 +264,13 @@
   .rt-editor p { margin: 0 0 10px; }
   .rt-editor p:last-child { margin-bottom: 0; }
   .rt-editor.ink-mode { caret-color: transparent; user-select: none; }
+  .rt-editor.readonly { cursor: pointer; }
+  .rt-editor.readonly:focus { outline: none; }
+  .rt-btn[disabled] { opacity:.45; cursor:not-allowed; }
+  .preview-modal { max-width:min(960px, calc(100vw - 32px)); width:100%; max-height:calc(100vh - 32px); overflow:auto; }
+  .preview-content { border:1px solid var(--bg3); border-radius:12px; background:var(--bg1); padding:16px; min-height:220px; }
+  .preview-ink-wrap { margin-top:14px; padding-top:12px; border-top:1px dashed var(--bg3); }
+  .preview-ink-wrap img { width:100%; height:auto; border:1px solid var(--bg3); border-radius:10px; background:white; }
   .rt-ink-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; z-index:2; touch-action:none; cursor:crosshair; background:transparent; pointer-events:none; }
   .rt-ink-canvas.ink-enabled { pointer-events:auto; }
   .rich-content { font-size:15px; line-height:1.8; color:#475569; }
@@ -998,6 +1005,29 @@ body.dark .rt-editor { background:transparent !important; }
 
 <input type="file" id="file-input" style="display:none"/>
 
+
+  <div class="modal-overlay hidden" id="modal-content-preview">
+    <div class="modal preview-modal">
+      <div class="modal-header">
+        <div class="modal-title" id="preview-title">Visualização</div>
+        <button class="modal-close" id="preview-close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="preview-content">
+          <div id="preview-rich-content"></div>
+          <div class="preview-ink-wrap hidden" id="preview-ink-wrap">
+            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-bottom:8px">✍️ Escrita manual</div>
+            <img id="preview-ink-image" alt="Anotação manual"/>
+          </div>
+        </div>
+        <div class="modal-btns">
+          <button class="btn btn-ghost" id="preview-edit-btn">✏️ Editar</button>
+          <button class="btn btn-primary" id="preview-ok-btn">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script>
 // ===== STATE =====
 let meetings = JSON.parse(localStorage.getItem('reunioes-data') || '[]');
@@ -1610,6 +1640,7 @@ function bindRichEditor(container, editorId, initialValue, onChange) {
   container.querySelectorAll(`[data-editor="${editorId}"]`).forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (btn.disabled || editor.getAttribute('contenteditable') !== 'true') return;
       editor.focus();
       const cmd = btn.dataset.cmd;
       if (cmd === 'clear') {
@@ -1623,6 +1654,70 @@ function bindRichEditor(container, editorId, initialValue, onChange) {
       sync();
     });
   });
+}
+
+
+function setFieldEditing(container, target, editorId, editing) {
+  formEditorModes[target] = !!editing;
+  const editor = container.querySelector('#' + editorId);
+  if (editor) {
+    editor.setAttribute('contenteditable', editing ? 'true' : 'false');
+    editor.classList.toggle('readonly', !editing);
+  }
+  container.querySelectorAll(`[data-editor="${editorId}"]`).forEach(btn => { btn.disabled = !editing; });
+  container.querySelectorAll(`[data-ink-target="${target}"]`).forEach(btn => { btn.disabled = !editing; });
+  const toggleBtn = container.querySelector(`[data-editor-toggle="${target}"]`);
+  if (toggleBtn) toggleBtn.textContent = editing ? '✅ Concluir edição' : '✏️ Editar';
+}
+
+function openContentPreview(title, html, inkData, onEdit) {
+  const modal = document.getElementById('modal-content-preview');
+  if (!modal) return;
+  document.getElementById('preview-title').textContent = title;
+  document.getElementById('preview-rich-content').innerHTML = html && html.trim()
+    ? `<div class="rich-content">${sanitizeRichHtml(html)}</div>`
+    : '<div class="section-empty">Sem conteúdo registrado.</div>';
+  const wrap = document.getElementById('preview-ink-wrap');
+  const img = document.getElementById('preview-ink-image');
+  if (inkData) {
+    wrap.classList.remove('hidden');
+    img.src = inkData;
+  } else {
+    wrap.classList.add('hidden');
+    img.removeAttribute('src');
+  }
+  document.getElementById('preview-edit-btn').onclick = () => {
+    modal.classList.add('hidden');
+    if (typeof onEdit === 'function') onEdit();
+  };
+  document.getElementById('preview-ok-btn').onclick = () => modal.classList.add('hidden');
+  document.getElementById('preview-close').onclick = () => modal.classList.add('hidden');
+  modal.classList.remove('hidden');
+}
+
+function setupReadPreviewMode(container, target, editorId, title, inkKey) {
+  setFieldEditing(container, target, editorId, !!formEditorModes[target]);
+  const toggleBtn = container.querySelector(`[data-editor-toggle="${target}"]`);
+  const stage = container.querySelector(`.rt-stage[data-ink-target="${target}"]`);
+  const editor = container.querySelector('#' + editorId);
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const next = !formEditorModes[target];
+      setFieldEditing(container, target, editorId, next);
+      if (next && editor) editor.focus();
+    });
+  }
+  if (stage) {
+    stage.addEventListener('click', (e) => {
+      if (formEditorModes[target]) return;
+      if (e.target.closest('.rt-toolbar') || e.target.closest('button')) return;
+      openContentPreview(title, formData[editorId === 'f-agenda' ? 'agenda' : 'notes'] || '', formData[inkKey] || '', () => {
+        setFieldEditing(container, target, editorId, true);
+        setTimeout(() => editor && editor.focus(), 30);
+      });
+    });
+  }
 }
 
 
@@ -1899,6 +1994,7 @@ function openForm(meeting) {
     agenda:'', agendaInk:'', notes:'', notesInk:'', participants:[], actions:[], documents:[], references:[]
   };
   formTab = 'geral';
+  formEditorModes = { agenda:false, notes:false };
   renderForm();
   showView('form');
 }
@@ -1987,6 +2083,7 @@ function renderTabContent() {
             <button class="rt-btn ink-tool" type="button" data-ink-target="agenda" data-ink-tool="eraser">🩹 Borracha</button>
             <button class="rt-btn" type="button" data-ink-target="agenda" data-ink-action="toggle">Ativar caneta</button>
             <button class="rt-btn" type="button" data-ink-target="agenda" data-ink-action="clear">Limpar traço</button>
+            <button class="rt-btn" type="button" data-editor-toggle="agenda">✏️ Editar</button>
           </div>
           <div class="rt-stage" data-ink-target="agenda">
             <div class="rt-editor" id="f-agenda" contenteditable="true" data-placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia..."></div>
@@ -2009,6 +2106,7 @@ function renderTabContent() {
             <button class="rt-btn ink-tool" type="button" data-ink-target="notes" data-ink-tool="eraser">🩹 Borracha</button>
             <button class="rt-btn" type="button" data-ink-target="notes" data-ink-action="toggle">Ativar caneta</button>
             <button class="rt-btn" type="button" data-ink-target="notes" data-ink-action="clear">Limpar traço</button>
+            <button class="rt-btn" type="button" data-editor-toggle="notes">✏️ Editar</button>
           </div>
           <div class="rt-stage" data-ink-target="notes">
             <div class="rt-editor" id="f-notes" contenteditable="true" data-placeholder="Registre as discussões, decisões tomadas e observações..."></div>
@@ -2031,6 +2129,8 @@ function renderTabContent() {
       editorId: 'f-notes',
       storageKey: 'notesInk'
     });
+    setupReadPreviewMode(c, 'agenda', 'f-agenda', 'Pauta / Objetivos', 'agendaInk');
+    setupReadPreviewMode(c, 'notes', 'f-notes', 'Anotações e Discussões', 'notesInk');
   }
 
   else if (formTab === 'participantes') {
