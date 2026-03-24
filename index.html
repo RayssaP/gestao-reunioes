@@ -257,15 +257,18 @@
   .rt-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); flex:0 0 auto; }
   .rt-btn { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--bg3); border-radius:8px; background:var(--bg2); color:var(--text2); font-size:13px; font-family:var(--font-mono); }
   .rt-btn:hover { background:var(--bg3); }
-  .rt-stage { position:relative; flex:1 1 auto; min-height:180px; background:#fff; }
-  .rt-editor { position:relative; z-index:1; min-height:180px; height:100%; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; overflow:auto; background:transparent; }
+  .rt-btn.active { background:#DBEAFE; border-color:#60A5FA; color:#1D4ED8; }
+  .rt-editor-area { position:relative; flex:1 1 auto; min-height:170px; }
+  .rt-editor { position:relative; z-index:1; height:100%; min-height:170px; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; overflow:auto; }
+  .rt-canvas { position:absolute; inset:0; width:100%; height:100%; z-index:2; display:none; touch-action:none; cursor:crosshair; background:transparent; }
+  .rt-canvas.active { display:block; }
+  .rt-drawing-preview { margin-top:10px; border:1px dashed var(--bg3); border-radius:10px; padding:10px; background:rgba(255,255,255,0.4); }
+  .rt-drawing-preview img { display:block; max-width:100%; border-radius:8px; }
+  .rt-drawing-hint { margin-top:6px; font-size:11px; color:var(--text3); font-family:var(--font-mono); }
   .rt-editor[data-placeholder]:empty:before { content: attr(data-placeholder); color: var(--text3); }
   .rt-editor ul, .rt-editor ol { padding-left: 22px; margin: 8px 0; }
   .rt-editor p { margin: 0 0 10px; }
   .rt-editor p:last-child { margin-bottom: 0; }
-  .rt-editor.ink-mode { caret-color: transparent; user-select: none; }
-  .rt-ink-canvas { position:absolute; inset:0; width:100%; height:100%; display:none; z-index:2; touch-action:none; cursor:crosshair; background:transparent; }
-  .rt-ink-canvas.ink-enabled { display:block; }
   .rich-content { font-size:15px; line-height:1.8; color:#475569; }
   .rich-content ul, .rich-content ol { padding-left: 22px; margin: 8px 0; }
   .rich-content p { margin: 0 0 10px; }
@@ -543,12 +546,6 @@
 .dash-animate:nth-child(3) { animation-delay: 0.1s; }
 .dash-animate:nth-child(4) { animation-delay: 0.15s; }
 
-/* ===== INK / CANETA ===== */
-.ink-btn-active { background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important; }
-.ink-preview { max-width:100%; border:1px solid var(--bg3); border-radius:10px; background:#fff; display:block; }
-body.dark .rt-stage { background:#fff; }
-body.dark .rt-editor { background:transparent !important; }
-
 /* ===== PRINT / PDF ===== */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
@@ -652,15 +649,6 @@ body.dark .rt-editor { background:transparent !important; }
   .doc-item { background: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-radius: 6px !important; padding: 6px 10px !important; margin-bottom: 4px !important; }
   .doc-name { font-size: 12px !important; }
   .doc-desc { font-size: 10px !important; color: #64748B !important; }
-
-  .ink-print-img {
-    max-width: 100% !important;
-    max-height: 260px !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 6px !important;
-    background: #fff !important;
-    display: block !important;
-  }
 
   .print-footer {
     display: block !important;
@@ -1596,9 +1584,151 @@ function plainToRichHtml(text) {
     .join('');
 }
 
-function renderRichContent(value, emptyText) {
+function renderRichContent(value, emptyText, drawingData) {
   const rich = plainToRichHtml(value);
-  return rich ? `<div class="rich-content">${rich}</div>` : `<div class="section-empty">${emptyText}</div>`;
+  const textBlock = rich ? `<div class="rich-content">${rich}</div>` : `<div class="section-empty">${emptyText}</div>`;
+  const drawingBlock = drawingData ? `<div class="rt-drawing-preview" style="margin-top:12px"><div style="font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-bottom:8px">✍️ Desenho manuscrito</div><img src="${drawingData}" alt="Desenho manuscrito"/></div>` : '';
+  return textBlock + drawingBlock;
+}
+
+function ensureDrawingState(obj) {
+  if (!obj.drawings) obj.drawings = { agenda:'', notes:'' };
+  if (obj.drawings.agenda === undefined) obj.drawings.agenda = '';
+  if (obj.drawings.notes === undefined) obj.drawings.notes = '';
+  return obj.drawings;
+}
+
+function fitCanvasToDisplay(canvas) {
+  if (!canvas) return;
+  const ratio = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const displayWidth = Math.max(1, Math.round(rect.width));
+  const displayHeight = Math.max(170, Math.round(rect.height));
+  const needResize = canvas.width !== Math.round(displayWidth * ratio) || canvas.height !== Math.round(displayHeight * ratio);
+  if (!needResize) return;
+  const previous = canvas.dataset.drawing || '';
+  canvas.width = Math.round(displayWidth * ratio);
+  canvas.height = Math.round(displayHeight * ratio);
+  canvas.style.width = displayWidth + 'px';
+  canvas.style.height = displayHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(ratio, ratio);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#1D4ED8';
+  ctx.clearRect(0,0,displayWidth,displayHeight);
+  if (previous) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+    img.src = previous;
+  }
+}
+
+function isCanvasBlank(canvas) {
+  const ctx = canvas.getContext('2d');
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let i = 3; i < pixels.length; i += 4) {
+    if (pixels[i] !== 0) return false;
+  }
+  return true;
+}
+
+function bindDrawingEditor(container, options) {
+  const { editorId, toggleId, clearId, previewId, initialDrawing, onChange } = options;
+  const area = container.querySelector(`[data-draw-area="${editorId}"]`);
+  const canvas = container.querySelector(`#${editorId}-canvas`);
+  const toggleBtn = container.querySelector(`#${toggleId}`);
+  const clearBtn = container.querySelector(`#${clearId}`);
+  const preview = container.querySelector(`#${previewId}`);
+  if (!area || !canvas || !toggleBtn || !clearBtn || !preview) return;
+
+  let drawingMode = false;
+  let drawing = false;
+
+  const renderPreview = (dataUrl) => {
+    preview.innerHTML = dataUrl
+      ? `<div style="font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-bottom:8px">✍️ Desenho salvo neste campo</div><img src="${dataUrl}" alt="Desenho manuscrito"/>`
+      : `<div class="rt-drawing-hint">Nenhum desenho salvo neste campo.</div>`;
+  };
+
+  const saveCanvas = () => {
+    const finalData = isCanvasBlank(canvas) ? '' : canvas.toDataURL('image/png');
+    canvas.dataset.drawing = finalData;
+    renderPreview(finalData);
+    onChange(finalData);
+  };
+
+  const setMode = (active) => {
+    drawingMode = active;
+    canvas.classList.toggle('active', active);
+    toggleBtn.classList.toggle('active', active);
+    toggleBtn.textContent = active ? '✍️ Desenho ligado' : '✍️ Desenhar';
+    area.querySelector('.rt-editor').contentEditable = active ? 'false' : 'true';
+  };
+
+  if (initialDrawing) canvas.dataset.drawing = initialDrawing;
+  fitCanvasToDisplay(canvas);
+  renderPreview(initialDrawing || '');
+
+  const getPoint = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  };
+
+  const start = (ev) => {
+    if (!drawingMode) return;
+    ev.preventDefault();
+    fitCanvasToDisplay(canvas);
+    drawing = true;
+    const ctx = canvas.getContext('2d');
+    const pt = getPoint(ev);
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
+  };
+
+  const move = (ev) => {
+    if (!drawingMode || !drawing) return;
+    ev.preventDefault();
+    const ctx = canvas.getContext('2d');
+    const pt = getPoint(ev);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  };
+
+  const end = () => {
+    if (!drawing) return;
+    drawing = false;
+    saveCanvas();
+  };
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    setMode(!drawingMode);
+    if (!canvas.dataset.boundResize) {
+      window.addEventListener('resize', () => fitCanvasToDisplay(canvas));
+      canvas.dataset.boundResize = '1';
+    }
+    if (!drawingMode) return;
+    fitCanvasToDisplay(canvas);
+  });
+
+  clearBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    fitCanvasToDisplay(canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    canvas.dataset.drawing = '';
+    renderPreview('');
+    onChange('');
+  });
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointerleave', end);
+  canvas.addEventListener('pointercancel', end);
 }
 
 function bindRichEditor(container, editorId, initialValue, onChange) {
@@ -1672,14 +1802,11 @@ function renderDetail(m) {
     <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
-        <div class="section-body">
-          ${renderRichContent(m.agenda, 'Nenhuma pauta registrada')}
-          ${m.agendaInk ? `<div style="margin-top:12px"><div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-bottom:6px">✍️ Escrita à mão na pauta</div><img src="${m.agendaInk}" alt="Anotação manuscrita da pauta" class="ink-preview ink-print-img"/></div>` : ''}
-        </div>
+        <div class="section-body">${renderRichContent(m.agenda, 'Nenhuma pauta registrada', m.drawings?.agenda)}</div>
       </div>
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📝 Anotações e Discussões</div>
-        <div class="section-body">${renderRichContent(m.notes, 'Nenhuma anotação')}</div>
+        <div class="section-body">${renderRichContent(m.notes, 'Nenhuma anotação', m.drawings?.notes)}</div>
       </div>
     </div>
 
@@ -1893,8 +2020,9 @@ function confirmDelete(m) {
 function openForm(meeting) {
   formData = meeting ? JSON.parse(JSON.stringify(meeting)) : {
     title:'', date:'', location:'', status:'Agendada',
-    agenda:'', agendaInk:'', notes:'', participants:[], actions:[], documents:[], references:[]
+    agenda:'', notes:'', drawings:{ agenda:'', notes:'' }, participants:[], actions:[], documents:[], references:[]
   };
+  ensureDrawingState(formData);
   formTab = 'geral';
   renderForm();
   showView('form');
@@ -1972,7 +2100,7 @@ function renderTabContent() {
     c.innerHTML = `
       <div style="margin-bottom:16px">
         <label class="lbl">Pauta / Objetivos</label>
-        <div class="rt-wrap">
+        <div class="rt-wrap" data-draw-area="f-agenda">
           <div class="rt-toolbar">
             <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="bold"><strong>B</strong></button>
             <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="italic"><em>I</em></button>
@@ -1981,21 +2109,20 @@ function renderTabContent() {
             <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="insertOrderedList">1. Lista</button>
             <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="paragraph">¶</button>
             <button class="rt-btn" type="button" data-editor="f-agenda" data-cmd="clear">Limpar</button>
-            <button class="rt-btn ink-tool ink-btn-active" type="button" data-ink-tool="pen">✍️ Caneta</button>
-            <button class="rt-btn ink-tool" type="button" data-ink-tool="eraser">🩹 Borracha</button>
-            <button class="rt-btn" type="button" id="btn-ink-toggle">Ativar caneta</button>
-            <button class="rt-btn" type="button" id="btn-ink-clear">Limpar traço</button>
+            <button class="rt-btn" type="button" id="toggle-draw-agenda">✍️ Desenhar</button>
+            <button class="rt-btn" type="button" id="clear-draw-agenda">🧽 Apagar desenho</button>
           </div>
-          <div class="rt-stage">
+          <div class="rt-editor-area">
             <div class="rt-editor" id="f-agenda" contenteditable="true" data-placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia..."></div>
-            <canvas id="agenda-ink-canvas" class="rt-ink-canvas"></canvas>
+            <canvas class="rt-canvas" id="f-agenda-canvas"></canvas>
           </div>
         </div>
-        <div style="margin-top:6px;font-size:12px;color:var(--text3)">No mesmo campo, você pode digitar normalmente ou ativar a caneta para escrever por cima.</div>
+        <div id="preview-draw-agenda" class="rt-drawing-preview"></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--text3)">Use ✍️ para alternar entre digitação e caneta no mesmo campo.</div>
       </div>
       <div>
         <label class="lbl">Anotações e Discussões</label>
-        <div class="rt-wrap">
+        <div class="rt-wrap" data-draw-area="f-notes">
           <div class="rt-toolbar">
             <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="bold"><strong>B</strong></button>
             <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="italic"><em>I</em></button>
@@ -2004,16 +2131,36 @@ function renderTabContent() {
             <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="insertOrderedList">1. Lista</button>
             <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="paragraph">¶</button>
             <button class="rt-btn" type="button" data-editor="f-notes" data-cmd="clear">Limpar</button>
+            <button class="rt-btn" type="button" id="toggle-draw-notes">✍️ Desenhar</button>
+            <button class="rt-btn" type="button" id="clear-draw-notes">🧽 Apagar desenho</button>
           </div>
-          <div class="rt-stage">
+          <div class="rt-editor-area">
             <div class="rt-editor" id="f-notes" contenteditable="true" data-placeholder="Registre as discussões, decisões tomadas e observações..."></div>
+            <canvas class="rt-canvas" id="f-notes-canvas"></canvas>
           </div>
         </div>
+        <div id="preview-draw-notes" class="rt-drawing-preview"></div>
       </div>
     `;
+    ensureDrawingState(formData);
     bindRichEditor(c, 'f-agenda', formData.agenda || '', value => { formData.agenda = value; });
     bindRichEditor(c, 'f-notes', formData.notes || '', value => { formData.notes = value; });
-    initAgendaInkCanvas(c);
+    bindDrawingEditor(c, {
+      editorId: 'f-agenda',
+      toggleId: 'toggle-draw-agenda',
+      clearId: 'clear-draw-agenda',
+      previewId: 'preview-draw-agenda',
+      initialDrawing: formData.drawings.agenda || '',
+      onChange: value => { formData.drawings.agenda = value; }
+    });
+    bindDrawingEditor(c, {
+      editorId: 'f-notes',
+      toggleId: 'toggle-draw-notes',
+      clearId: 'clear-draw-notes',
+      previewId: 'preview-draw-notes',
+      initialDrawing: formData.drawings.notes || '',
+      onChange: value => { formData.drawings.notes = value; }
+    });
   }
 
   else if (formTab === 'participantes') {
@@ -2220,6 +2367,7 @@ function renderRefsTab(c) {
 }
 
 function saveForm() {
+  ensureDrawingState(formData);
   if (!formData.title || !formData.title.trim()) {
     showToast('Informe o título da reunião', 'info'); return;
   }
@@ -2671,176 +2819,6 @@ function runSearch() {
       selectMeeting(card.dataset.id);
     });
   });
-}
-
-function trimTransparentCanvas(canvas) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  const data = ctx.getImageData(0, 0, width, height).data;
-  let top = null, left = null, right = null, bottom = null;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const alpha = data[(y * width + x) * 4 + 3];
-      if (alpha > 0) {
-        if (top === null) top = y;
-        if (left === null || x < left) left = x;
-        if (right === null || x > right) right = x;
-        bottom = y;
-      }
-    }
-  }
-  if (top === null) return '';
-  const pad = 8;
-  left = Math.max(0, left - pad);
-  top = Math.max(0, top - pad);
-  right = Math.min(width - 1, right + pad);
-  bottom = Math.min(height - 1, bottom + pad);
-  const out = document.createElement('canvas');
-  out.width = right - left + 1;
-  out.height = bottom - top + 1;
-  const octx = out.getContext('2d');
-  octx.fillStyle = '#ffffff';
-  octx.fillRect(0, 0, out.width, out.height);
-  octx.drawImage(canvas, left, top, out.width, out.height, 0, 0, out.width, out.height);
-  return out.toDataURL('image/png');
-}
-
-function initAgendaInkCanvas(container) {
-  const canvas = container.querySelector('#agenda-ink-canvas');
-  const editor = container.querySelector('#f-agenda');
-  const stage = container.querySelector('.rt-stage');
-  if (!canvas || !editor || !stage) return;
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  let drawing = false;
-  let inkEnabled = false;
-  let currentTool = 'pen';
-  let lastX = 0;
-  let lastY = 0;
-
-  function syncInkUI() {
-    const toggleBtn = container.querySelector('#btn-ink-toggle');
-    canvas.classList.toggle('ink-enabled', inkEnabled);
-    editor.classList.toggle('ink-mode', inkEnabled);
-    editor.contentEditable = inkEnabled ? 'false' : 'true';
-    if (toggleBtn) toggleBtn.textContent = inkEnabled ? 'Desativar caneta' : 'Ativar caneta';
-  }
-
-  function drawStoredImage(dataUrl) {
-    if (!dataUrl) return;
-    const rect = stage.getBoundingClientRect();
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      ctx.drawImage(img, 0, 0, rect.width, rect.height);
-    };
-    img.src = dataUrl;
-  }
-
-  function resizeCanvas() {
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const rect = stage.getBoundingClientRect();
-    const prev = formData.agendaInk || trimTransparentCanvas(canvas);
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(ratio, ratio);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.imageSmoothingEnabled = true;
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    if (prev) drawStoredImage(prev);
-  }
-
-  function saveInk() {
-    formData.agendaInk = trimTransparentCanvas(canvas);
-  }
-
-  function getPos(ev) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
-  }
-
-  function applyTool() {
-    if (currentTool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 18;
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#111827';
-    }
-  }
-
-  function start(ev) {
-    if (!inkEnabled) return;
-    ev.preventDefault();
-    drawing = true;
-    canvas.setPointerCapture?.(ev.pointerId);
-    const pos = getPos(ev);
-    lastX = pos.x;
-    lastY = pos.y;
-    applyTool();
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-  }
-
-  function move(ev) {
-    if (!drawing || !inkEnabled) return;
-    ev.preventDefault();
-    const pos = getPos(ev);
-    applyTool();
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastX = pos.x;
-    lastY = pos.y;
-  }
-
-  function end(ev) {
-    if (!drawing) return;
-    ev.preventDefault();
-    drawing = false;
-    canvas.releasePointerCapture?.(ev.pointerId);
-    saveInk();
-  }
-
-  canvas.addEventListener('pointerdown', start);
-  canvas.addEventListener('pointermove', move);
-  canvas.addEventListener('pointerup', end);
-  canvas.addEventListener('pointercancel', end);
-  canvas.addEventListener('pointerleave', end);
-
-  container.querySelectorAll('.ink-tool').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentTool = btn.dataset.inkTool;
-      container.querySelectorAll('.ink-tool').forEach(b => b.classList.remove('ink-btn-active'));
-      btn.classList.add('ink-btn-active');
-    });
-  });
-
-  container.querySelector('#btn-ink-toggle')?.addEventListener('click', () => {
-    inkEnabled = !inkEnabled;
-    syncInkUI();
-    if (!inkEnabled) editor.focus();
-  });
-
-  container.querySelector('#btn-ink-clear')?.addEventListener('click', () => {
-    const rect = stage.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    formData.agendaInk = '';
-  });
-
-  resizeCanvas();
-  syncInkUI();
-  if (window.ResizeObserver) {
-    const ro = new ResizeObserver(() => resizeCanvas());
-    ro.observe(stage);
-  } else {
-    window.addEventListener('resize', resizeCanvas, { passive: true });
-  }
 }
 
 // ===== EVENTS =====
