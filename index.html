@@ -653,6 +653,56 @@
     text-align: center;
   }
 }
+
+  /* Pull-to-refresh */
+  #pull-refresh-indicator {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translate(-50%, -18px);
+    min-width: 180px;
+    max-width: calc(100vw - 24px);
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.96);
+    border: 1px solid var(--bg3);
+    box-shadow: 0 8px 24px rgba(15,23,42,.12);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    z-index: 1200;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .18s ease, opacity .18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  #pull-refresh-indicator.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  #pull-refresh-indicator.ready {
+    border-color: #93c5fd;
+    color: #1d4ed8;
+  }
+  #pull-refresh-indicator.refreshing {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  #pull-refresh-spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #cbd5e1;
+    border-top-color: #2563eb;
+    display: none;
+    animation: ptr-spin .8s linear infinite;
+  }
+  #pull-refresh-indicator.refreshing #pull-refresh-spinner { display: inline-block; }
+  @keyframes ptr-spin { to { transform: rotate(360deg); } }
+
 </style>
 </head>
 <body>
@@ -678,6 +728,12 @@
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
+
+
+<div id="pull-refresh-indicator" aria-live="polite" aria-hidden="true">
+  <span id="pull-refresh-spinner"></span>
+  <span id="pull-refresh-text">Puxe para atualizar</span>
+</div>
 
 <div id="sidebar-overlay"></div>
 <div id="app">
@@ -1391,6 +1447,135 @@ function setTheme(theme) {
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (settings.theme === 'auto') applyTheme('auto');
 });
+
+
+
+// ===== PULL TO REFRESH (mobile) =====
+let ptrStartY = 0;
+let ptrPulling = false;
+let ptrReady = false;
+let ptrRefreshing = false;
+const PTR_THRESHOLD = 84;
+
+function getPullRefreshElements() {
+  return {
+    box: document.getElementById('pull-refresh-indicator'),
+    text: document.getElementById('pull-refresh-text')
+  };
+}
+
+function getActiveScrollContainer() {
+  const ve = document.getElementById('view-empty');
+  const vd = document.getElementById('view-detail');
+  const vf = document.getElementById('view-form');
+  if (vf && vf.style.display !== 'none') return vf;
+  if (vd && vd.style.display !== 'none') return vd;
+  if (ve && ve.style.display !== 'none') return ve;
+  return document.getElementById('content') || document.scrollingElement || document.documentElement;
+}
+
+function ptrSetState(state, distance = 0) {
+  const { box, text } = getPullRefreshElements();
+  if (!box || !text) return;
+  box.classList.remove('show', 'ready', 'refreshing');
+  if (state === 'hidden') {
+    box.style.transform = 'translate(-50%, -18px)';
+    box.style.opacity = '0';
+    text.textContent = 'Puxe para atualizar';
+    return;
+  }
+  const extra = Math.min(distance, 110);
+  box.style.transform = `translate(-50%, ${Math.max(0, extra * 0.35)}px)`;
+  box.classList.add('show');
+  if (state === 'pulling') {
+    text.textContent = 'Puxe para atualizar';
+  } else if (state === 'ready') {
+    box.classList.add('ready');
+    text.textContent = 'Solte para atualizar';
+  } else if (state === 'refreshing') {
+    box.classList.add('refreshing');
+    text.textContent = 'Atualizando…';
+  }
+}
+
+async function forcePullRefresh() {
+  if (ptrRefreshing) return;
+  ptrRefreshing = true;
+  ptrSetState('refreshing');
+  try {
+    if (hasValidGoogleToken() || settings.odClientId) {
+      await odLoadAll();
+    } else {
+      renderSidebar();
+      renderDashboard();
+      showToast('Atualizado localmente.', 'info');
+    }
+  } catch (e) {
+    showToast('Erro ao atualizar: ' + (e?.message || e), 'info');
+  } finally {
+    setTimeout(() => {
+      ptrRefreshing = false;
+      ptrPulling = false;
+      ptrReady = false;
+      ptrSetState('hidden');
+    }, 250);
+  }
+}
+
+function initPullToRefresh() {
+  const isTouch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  if (!isTouch) return;
+
+  document.addEventListener('touchstart', (e) => {
+    if (ptrRefreshing) return;
+    const target = e.target;
+    if (target && target.closest('.modal-overlay, .modal, [contenteditable="true"], textarea, input, select')) return;
+    const scroller = getActiveScrollContainer();
+    const top = (scroller?.scrollTop || 0) <= 0;
+    if (!top) return;
+    ptrStartY = e.touches[0].clientY;
+    ptrPulling = true;
+    ptrReady = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!ptrPulling || ptrRefreshing) return;
+    const target = e.target;
+    if (target && target.closest('.modal-overlay, .modal, [contenteditable="true"], textarea, input, select')) {
+      ptrPulling = false;
+      ptrSetState('hidden');
+      return;
+    }
+    const scroller = getActiveScrollContainer();
+    const dy = e.touches[0].clientY - ptrStartY;
+    if ((scroller?.scrollTop || 0) > 0 || dy <= 0) {
+      ptrPulling = false;
+      ptrReady = false;
+      ptrSetState('hidden');
+      return;
+    }
+    const dist = Math.min(dy, 130);
+    ptrReady = dist >= PTR_THRESHOLD;
+    ptrSetState(ptrReady ? 'ready' : 'pulling', dist);
+    if (dist > 8) e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', async () => {
+    if (!ptrPulling || ptrRefreshing) {
+      ptrPulling = false;
+      ptrReady = false;
+      return;
+    }
+    const shouldRefresh = ptrReady;
+    ptrPulling = false;
+    ptrReady = false;
+    if (shouldRefresh) {
+      await forcePullRefresh();
+    } else {
+      ptrSetState('hidden');
+    }
+  }, { passive: true });
+}
 
 // ===== AUTO-SYNC CONFIGURÁVEL =====
 let autoSyncTimer = null;
