@@ -264,8 +264,8 @@
   .rt-editor p { margin: 0 0 10px; }
   .rt-editor p:last-child { margin-bottom: 0; }
   .rt-editor.ink-mode { caret-color: transparent; user-select: none; }
-  .rt-ink-canvas { position:absolute; inset:0; width:100%; height:100%; display:none; z-index:2; touch-action:none; cursor:crosshair; background:transparent; }
-  .rt-ink-canvas.ink-enabled { display:block; }
+  .rt-ink-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; z-index:2; touch-action:none; cursor:crosshair; background:transparent; pointer-events:none; }
+  .rt-ink-canvas.ink-enabled { pointer-events:auto; }
   .rich-content { font-size:15px; line-height:1.8; color:#475569; }
   .rich-content ul, .rich-content ol { padding-left: 22px; margin: 8px 0; }
   .rich-content p { margin: 0 0 10px; }
@@ -2690,36 +2690,19 @@ function runSearch() {
   });
 }
 
-function trimTransparentCanvas(canvas) {
-  const ctx = canvas.getContext('2d');
+function canvasHasInk(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const { width, height } = canvas;
+  if (!width || !height) return false;
   const data = ctx.getImageData(0, 0, width, height).data;
-  let top = null, left = null, right = null, bottom = null;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const alpha = data[(y * width + x) * 4 + 3];
-      if (alpha > 0) {
-        if (top === null) top = y;
-        if (left === null || x < left) left = x;
-        if (right === null || x > right) right = x;
-        bottom = y;
-      }
-    }
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 0) return true;
   }
-  if (top === null) return '';
-  const pad = 8;
-  left = Math.max(0, left - pad);
-  top = Math.max(0, top - pad);
-  right = Math.min(width - 1, right + pad);
-  bottom = Math.min(height - 1, bottom + pad);
-  const out = document.createElement('canvas');
-  out.width = right - left + 1;
-  out.height = bottom - top + 1;
-  const octx = out.getContext('2d');
-  octx.fillStyle = '#ffffff';
-  octx.fillRect(0, 0, out.width, out.height);
-  octx.drawImage(canvas, left, top, out.width, out.height, 0, 0, out.width, out.height);
-  return out.toDataURL('image/png');
+  return false;
+}
+
+function serializeCanvas(canvas) {
+  return canvasHasInk(canvas) ? canvas.toDataURL('image/png') : '';
 }
 
 function initInkCanvas(container, config) {
@@ -2766,7 +2749,7 @@ function initInkCanvas(container, config) {
   function resizeCanvas() {
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
     const size = getStageSize();
-    const prev = formData[storageKey] || trimTransparentCanvas(canvas);
+    const prev = formData[storageKey] || serializeCanvas(canvas);
     canvas.width = Math.max(1, Math.floor(size.width * ratio));
     canvas.height = Math.max(1, Math.floor(size.height * ratio));
     canvas.style.width = `${size.width}px`;
@@ -2781,7 +2764,7 @@ function initInkCanvas(container, config) {
   }
 
   function saveInk() {
-    formData[storageKey] = trimTransparentCanvas(canvas);
+    formData[storageKey] = serializeCanvas(canvas);
   }
 
   function getPos(ev) {
