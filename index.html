@@ -253,11 +253,11 @@
   .doc-desc { font-size: 12px; color: var(--text3); }
 
   /* RICH TEXT */
-  .rt-wrap { border:1px solid var(--bg3); border-radius:10px; overflow:hidden; background:#F8FAFC; }
-  .rt-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); }
+  .rt-wrap { border:1px solid var(--bg3); border-radius:10px; overflow:hidden; background:#F8FAFC; display:flex; flex-direction:column; min-height:240px; resize:vertical; }
+  .rt-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); flex:0 0 auto; }
   .rt-btn { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--bg3); border-radius:8px; background:var(--bg2); color:var(--text2); font-size:13px; font-family:var(--font-mono); }
   .rt-btn:hover { background:var(--bg3); }
-  .rt-editor { min-height:150px; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; }
+  .rt-editor { flex:1 1 auto; min-height:150px; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; overflow:auto; }
   .rt-editor[data-placeholder]:empty:before { content: attr(data-placeholder); color: var(--text3); }
   .rt-editor ul, .rt-editor ol { padding-left: 22px; margin: 8px 0; }
   .rt-editor p { margin: 0 0 10px; }
@@ -1937,6 +1937,7 @@ function renderTabContent() {
           <label class="lbl">Local / Link</label>
           <input class="inp" id="f-location" value="${escHtml(formData.location||'')}" placeholder="Ex: Sala de reuniões A / Meet"/>
         </div>
+        <div style="margin-top:6px;font-size:12px;color:var(--text3)">Arraste o canto inferior direito para expandir o campo.</div>
       </div>
     `;
     c.querySelector('#f-title').oninput = e => { formData.title = e.target.value; };
@@ -1961,6 +1962,7 @@ function renderTabContent() {
           </div>
           <div class="rt-editor" id="f-agenda" contenteditable="true" data-placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia..."></div>
         </div>
+        <div style="margin-top:6px;font-size:12px;color:var(--text3)">Arraste o canto inferior direito para expandir o campo.</div>
       </div>
       <div>
         <label class="lbl">Anotações e Discussões</label>
