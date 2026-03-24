@@ -539,6 +539,17 @@
 .dash-animate:nth-child(3) { animation-delay: 0.1s; }
 .dash-animate:nth-child(4) { animation-delay: 0.15s; }
 
+/* ===== INK / CANETA ===== */
+.ink-wrap { border:1px solid var(--bg3); border-radius:10px; background:#F8FAFC; overflow:hidden; }
+.ink-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); }
+.ink-canvas-wrap { padding:10px; }
+.ink-canvas { width:100%; height:280px; display:block; border:1px dashed var(--bg3); border-radius:10px; background:#fff; touch-action:none; cursor:crosshair; }
+.ink-btn-active { background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important; }
+.ink-badge { font-size:11px; color:var(--text3); font-family:var(--font-mono); }
+.ink-preview { max-width:100%; border:1px solid var(--bg3); border-radius:10px; background:#fff; display:block; }
+body.dark .ink-wrap { background:#0F172A !important; }
+body.dark .ink-canvas { background:#fff; }
+
 /* ===== PRINT / PDF ===== */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
@@ -642,6 +653,15 @@
   .doc-item { background: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-radius: 6px !important; padding: 6px 10px !important; margin-bottom: 4px !important; }
   .doc-name { font-size: 12px !important; }
   .doc-desc { font-size: 10px !important; color: #64748B !important; }
+
+  .ink-print-img {
+    max-width: 100% !important;
+    max-height: 260px !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    display: block !important;
+  }
 
   .print-footer {
     display: block !important;
@@ -1653,7 +1673,10 @@ function renderDetail(m) {
     <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
-        <div class="section-body">${renderRichContent(m.agenda, 'Nenhuma pauta registrada')}</div>
+        <div class="section-body">
+          ${renderRichContent(m.agenda, 'Nenhuma pauta registrada')}
+          ${m.agendaInk ? `<div style="margin-top:12px"><div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-bottom:6px">✍️ Anotação manuscrita</div><img src="${m.agendaInk}" alt="Anotação manuscrita da pauta" class="ink-preview ink-print-img"/></div>` : ''}
+        </div>
       </div>
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📝 Anotações e Discussões</div>
@@ -1871,7 +1894,7 @@ function confirmDelete(m) {
 function openForm(meeting) {
   formData = meeting ? JSON.parse(JSON.stringify(meeting)) : {
     title:'', date:'', location:'', status:'Agendada',
-    agenda:'', notes:'', participants:[], actions:[], documents:[], references:[]
+    agenda:'', agendaInk:'', notes:'', participants:[], actions:[], documents:[], references:[]
   };
   formTab = 'geral';
   renderForm();
@@ -1964,6 +1987,20 @@ function renderTabContent() {
         </div>
         <div style="margin-top:6px;font-size:12px;color:var(--text3)">Arraste o canto inferior direito para expandir o campo.</div>
       </div>
+      <div style="margin-bottom:16px">
+        <label class="lbl">Pauta manuscrita com caneta</label>
+        <div class="ink-wrap">
+          <div class="ink-toolbar">
+            <button class="btn btn-ghost btn-sm ink-tool ink-btn-active" type="button" data-ink-tool="pen">✍️ Caneta</button>
+            <button class="btn btn-ghost btn-sm ink-tool" type="button" data-ink-tool="eraser">🩹 Borracha</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="btn-ink-clear">🧹 Limpar</button>
+            <span class="ink-badge">Use caneta, dedo ou mouse. O conteúdo é salvo junto com a reunião.</span>
+          </div>
+          <div class="ink-canvas-wrap">
+            <canvas id="agenda-ink-canvas" class="ink-canvas"></canvas>
+          </div>
+        </div>
+      </div>
       <div>
         <label class="lbl">Anotações e Discussões</label>
         <div class="rt-wrap">
@@ -1982,6 +2019,7 @@ function renderTabContent() {
     `;
     bindRichEditor(c, 'f-agenda', formData.agenda || '', value => { formData.agenda = value; });
     bindRichEditor(c, 'f-notes', formData.notes || '', value => { formData.notes = value; });
+    initAgendaInkCanvas(c);
   }
 
   else if (formTab === 'participantes') {
@@ -2639,6 +2677,168 @@ function runSearch() {
       selectMeeting(card.dataset.id);
     });
   });
+}
+
+function trimTransparentCanvas(canvas) {
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+  const data = ctx.getImageData(0, 0, width, height).data;
+  let top = null, left = null, right = null, bottom = null;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = data[(y * width + x) * 4 + 3];
+      if (alpha > 0) {
+        if (top === null) top = y;
+        if (left === null || x < left) left = x;
+        if (right === null || x > right) right = x;
+        bottom = y;
+      }
+    }
+  }
+  if (top === null) return '';
+  const pad = 8;
+  left = Math.max(0, left - pad);
+  top = Math.max(0, top - pad);
+  right = Math.min(width - 1, right + pad);
+  bottom = Math.min(height - 1, bottom + pad);
+  const out = document.createElement('canvas');
+  out.width = right - left + 1;
+  out.height = bottom - top + 1;
+  const octx = out.getContext('2d');
+  octx.fillStyle = '#ffffff';
+  octx.fillRect(0, 0, out.width, out.height);
+  octx.drawImage(canvas, left, top, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
+function initAgendaInkCanvas(container) {
+  const canvas = container.querySelector('#agenda-ink-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let drawing = false;
+  let currentTool = 'pen';
+  let lastX = 0;
+  let lastY = 0;
+
+  function resizeCanvas() {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const rect = canvas.getBoundingClientRect();
+    const prev = trimTransparentCanvas(canvas);
+    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(ratio, ratio);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.imageSmoothingEnabled = true;
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    if (prev) {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = rect.width - 16;
+        const maxH = rect.height - 16;
+        const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, 8, 8, w, h);
+      };
+      img.src = prev;
+    } else if (formData.agendaInk) {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = rect.width - 16;
+        const maxH = rect.height - 16;
+        const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, 8, 8, w, h);
+      };
+      img.src = formData.agendaInk;
+    }
+  }
+
+  function saveInk() {
+    formData.agendaInk = trimTransparentCanvas(canvas);
+  }
+
+  function getPos(ev) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  }
+
+  function applyTool() {
+    if (currentTool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#111827';
+    }
+  }
+
+  function start(ev) {
+    ev.preventDefault();
+    drawing = true;
+    canvas.setPointerCapture?.(ev.pointerId);
+    const pos = getPos(ev);
+    lastX = pos.x;
+    lastY = pos.y;
+    applyTool();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+  }
+
+  function move(ev) {
+    if (!drawing) return;
+    ev.preventDefault();
+    const pos = getPos(ev);
+    applyTool();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastX = pos.x;
+    lastY = pos.y;
+  }
+
+  function end(ev) {
+    if (!drawing) return;
+    ev.preventDefault();
+    drawing = false;
+    canvas.releasePointerCapture?.(ev.pointerId);
+    saveInk();
+  }
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('pointerleave', end);
+
+  container.querySelectorAll('.ink-tool').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTool = btn.dataset.inkTool;
+      container.querySelectorAll('.ink-tool').forEach(b => b.classList.remove('ink-btn-active'));
+      btn.classList.add('ink-btn-active');
+    });
+  });
+
+  const clearBtn = container.querySelector('#btn-ink-clear');
+  clearBtn?.addEventListener('click', () => {
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    formData.agendaInk = '';
+  });
+
+  resizeCanvas();
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => resizeCanvas());
+    ro.observe(canvas);
+  } else {
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+  }
 }
 
 // ===== EVENTS =====
