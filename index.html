@@ -637,6 +637,71 @@
     text-align: center;
   }
 }
+
+  /* ── RICH TEXT EDITOR ── */
+  .rte-wrap { border: 1px solid var(--bg3); border-radius: 8px; overflow: hidden; background: #F8FAFC; transition: border-color 0.15s; }
+  .rte-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245,158,11,0.12); }
+  body.dark .rte-wrap { background: #0F172A; }
+
+  .rte-toolbar {
+    display: flex; gap: 2px; padding: 5px 8px;
+    border-bottom: 1px solid var(--bg3);
+    background: var(--bg2); flex-wrap: wrap; align-items: center;
+  }
+  body.dark .rte-toolbar { background: #1E293B; }
+
+  .rte-btn {
+    background: none; border: none; border-radius: 5px;
+    padding: 3px 7px; font-size: 13px; color: var(--text2);
+    cursor: pointer; font-family: var(--font-body);
+    transition: all 0.12s; line-height: 1.4;
+    min-width: 28px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .rte-btn:hover { background: var(--bg3); color: var(--text); }
+  .rte-btn.active { background: var(--accent); color: #0F172A; font-weight: 700; }
+  .rte-btn b { font-weight: 800; }
+  .rte-btn i { font-style: italic; }
+
+  .rte-divider { width: 1px; background: var(--bg3); height: 18px; margin: 0 3px; align-self: center; flex-shrink: 0; }
+
+  .rte-editor {
+    padding: 12px 14px; min-height: 130px; max-height: 420px;
+    overflow-y: auto; outline: none;
+    font-size: 14px; line-height: 1.75; color: var(--text);
+    font-family: var(--font-body);
+  }
+  .rte-editor:empty::before {
+    content: attr(data-ph); color: var(--text3); pointer-events: none;
+  }
+  .rte-editor h2 { font-size: 16px; font-weight: 700; color: var(--text); margin: 10px 0 4px; }
+  .rte-editor h3 { font-size: 14px; font-weight: 600; color: var(--text); margin: 8px 0 3px; }
+  .rte-editor ul { padding-left: 22px; margin: 4px 0; list-style: disc; }
+  .rte-editor ol { padding-left: 22px; margin: 4px 0; list-style: decimal; }
+  .rte-editor li { margin: 3px 0; }
+  .rte-editor strong, .rte-editor b { font-weight: 700; }
+  .rte-editor em, .rte-editor i { font-style: italic; }
+  .rte-editor u { text-decoration: underline; }
+  .rte-editor s { text-decoration: line-through; }
+  .rte-editor hr { border: none; border-top: 2px solid var(--bg3); margin: 10px 0; }
+  .rte-editor a { color: var(--blue); text-decoration: underline; }
+  .rte-editor blockquote { border-left: 3px solid var(--accent); padding: 4px 12px; margin: 6px 0; color: var(--text2); font-style: italic; }
+  body.dark .rte-editor { color: var(--text); }
+
+  /* Rendered RTE output (detail view) */
+  .rte-output { font-size: 15px; line-height: 1.8; color: #475569; }
+  .rte-output h2 { font-size: 16px; font-weight: 700; color: #1E293B; margin: 10px 0 4px; }
+  .rte-output h3 { font-size: 14px; font-weight: 600; color: #1E293B; margin: 8px 0 3px; }
+  .rte-output ul { padding-left: 22px; margin: 4px 0; list-style: disc; }
+  .rte-output ol { padding-left: 22px; margin: 4px 0; list-style: decimal; }
+  .rte-output li { margin: 3px 0; }
+  .rte-output strong, .rte-output b { font-weight: 700; }
+  .rte-output em, .rte-output i { font-style: italic; }
+  .rte-output u { text-decoration: underline; }
+  .rte-output s { text-decoration: line-through; }
+  .rte-output hr { border: none; border-top: 2px solid var(--bg3); margin: 10px 0; }
+  .rte-output blockquote { border-left: 3px solid var(--accent); padding: 4px 12px; margin: 6px 0; color: var(--text3); font-style: italic; }
+  body.dark .rte-output { color: var(--text2); }
+  body.dark .rte-output h2, body.dark .rte-output h3 { color: var(--text); }
 </style>
 </head>
 <body>
@@ -1567,11 +1632,11 @@ function renderDetail(m) {
     <div class="grid2 grid-pauta" style="margin-bottom:20px">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
-        <div class="section-body">${m.agenda?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
+        <div class="section-body">${m.agenda?`<div class="rte-output">${rteRender(m.agenda)}</div>`:'<div class="section-empty">Nenhuma pauta registrada</div>'}</div>
       </div>
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📝 Anotações e Discussões</div>
-        <div class="section-body">${m.notes?`<div style="font-size:15px;line-height:1.8;color:#475569;white-space:pre-wrap">${escHtml(m.notes)}</div>`:'<div class="section-empty">Nenhuma anotação</div>'}</div>
+        <div class="section-body">${m.notes?`<div class="rte-output">${rteRender(m.notes)}</div>`:'<div class="section-empty">Nenhuma anotação</div>'}</div>
       </div>
     </div>
 
@@ -1792,7 +1857,92 @@ function openForm(meeting) {
   showView('form');
 }
 
-function renderForm() {
+// ===== RICH TEXT EDITOR =====
+function rteHTML(id, placeholder) {
+  return `
+  <div class="rte-wrap">
+    <div class="rte-toolbar" data-rte="${id}">
+      <button class="rte-btn" data-cmd="bold"    title="Negrito (Ctrl+B)"><b>B</b></button>
+      <button class="rte-btn" data-cmd="italic"  title="Itálico (Ctrl+I)"><i>I</i></button>
+      <button class="rte-btn" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u style="text-decoration:underline">U</u></button>
+      <button class="rte-btn" data-cmd="strikeThrough" title="Tachado"><s>S</s></button>
+      <div class="rte-divider"></div>
+      <button class="rte-btn" data-cmd="formatBlock" data-val="h2"  title="Título">H2</button>
+      <button class="rte-btn" data-cmd="formatBlock" data-val="h3"  title="Subtítulo">H3</button>
+      <button class="rte-btn" data-cmd="formatBlock" data-val="p"   title="Parágrafo" style="font-size:11px">¶</button>
+      <button class="rte-btn" data-cmd="formatBlock" data-val="blockquote" title="Citação" style="font-size:14px">❝</button>
+      <div class="rte-divider"></div>
+      <button class="rte-btn" data-cmd="insertUnorderedList" title="Lista de marcadores" style="font-size:11px">• —</button>
+      <button class="rte-btn" data-cmd="insertOrderedList"   title="Lista numerada" style="font-size:11px">1. —</button>
+      <button class="rte-btn" data-cmd="indent"   title="Aumentar recuo" style="font-size:12px">→</button>
+      <button class="rte-btn" data-cmd="outdent"  title="Diminuir recuo" style="font-size:12px">←</button>
+      <div class="rte-divider"></div>
+      <button class="rte-btn" data-cmd="insertHorizontalRule" title="Linha separadora" style="font-size:11px">—</button>
+      <button class="rte-btn" data-cmd="removeFormat" title="Limpar formatação" style="font-size:11px;color:#EF4444">✕</button>
+    </div>
+    <div class="rte-editor" id="${id}" contenteditable="true" data-ph="${placeholder}"></div>
+  </div>`;
+}
+
+function initRTE(id, initialValue, onChange) {
+  const editor = document.getElementById(id);
+  const toolbar = document.querySelector('.rte-toolbar[data-rte="' + id + '"]');
+  if (!editor || !toolbar) return;
+
+  // Carrega valor inicial — retrocompatível: texto puro ou HTML
+  if (initialValue) {
+    const hasHTML = /<[a-z][\s\S]*>/i.test(initialValue);
+    if (hasHTML) { editor.innerHTML = initialValue; }
+    else { editor.textContent = initialValue; }
+  }
+
+  // Sync no input
+  editor.addEventListener('input', () => {
+    onChange(editor.innerHTML === '<br>' ? '' : editor.innerHTML);
+    rteUpdateState(id);
+  });
+
+  // Atualiza estado dos botões ao mover cursor
+  editor.addEventListener('keyup',   () => rteUpdateState(id));
+  editor.addEventListener('mouseup', () => rteUpdateState(id));
+  editor.addEventListener('focus',   () => rteUpdateState(id));
+
+  // Toolbar cliques
+  toolbar.addEventListener('mousedown', e => {
+    const btn = e.target.closest('[data-cmd]');
+    if (!btn) return;
+    e.preventDefault(); // mantém o foco no editor
+    editor.focus();
+    const cmd = btn.dataset.cmd;
+    const val = btn.dataset.val || null;
+    document.execCommand(cmd, false, val);
+    onChange(editor.innerHTML === '<br>' ? '' : editor.innerHTML);
+    rteUpdateState(id);
+  });
+}
+
+function rteUpdateState(id) {
+  const toolbar = document.querySelector('.rte-toolbar[data-rte="' + id + '"]');
+  if (!toolbar) return;
+  toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
+    const cmd = btn.dataset.cmd;
+    try {
+      if (['bold','italic','underline','strikeThrough','insertUnorderedList','insertOrderedList'].includes(cmd)) {
+        btn.classList.toggle('active', document.queryCommandState(cmd));
+      }
+    } catch(e) {}
+  });
+}
+
+// Renderiza conteúdo salvo (HTML ou texto puro) na view de detalhe
+function rteRender(value) {
+  if (!value) return '';
+  if (/<[a-z][\s\S]*>/i.test(value)) return value;
+  // Texto puro legado → converte quebras de linha em <br>
+  return escHtml(value).replace(/\n/g, '<br>');
+}
+
+
   const isEdit = !!formData.id;
   const el = document.getElementById('form-view');
   el.innerHTML = `
@@ -1861,17 +2011,17 @@ function renderTabContent() {
 
   else if (formTab === 'pauta') {
     c.innerHTML = `
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:20px">
         <label class="lbl">Pauta / Objetivos</label>
-        <textarea class="inp" id="f-agenda" rows="6" placeholder="Descreva os tópicos da pauta, objetivos e ordem do dia...">${escHtml(formData.agenda||'')}</textarea>
+        ${rteHTML('f-agenda','Descreva os tópicos da pauta, objetivos e ordem do dia...')}
       </div>
       <div>
         <label class="lbl">Anotações e Discussões</label>
-        <textarea class="inp" id="f-notes" rows="8" placeholder="Registre as discussões, decisões tomadas e observações...">${escHtml(formData.notes||'')}</textarea>
+        ${rteHTML('f-notes','Registre as discussões, decisões tomadas e observações...')}
       </div>
     `;
-    c.querySelector('#f-agenda').oninput = e => { formData.agenda = e.target.value; };
-    c.querySelector('#f-notes').oninput = e => { formData.notes = e.target.value; };
+    initRTE('f-agenda', formData.agenda || '', v => { formData.agenda = v; });
+    initRTE('f-notes',  formData.notes  || '', v => { formData.notes  = v; });
   }
 
   else if (formTab === 'participantes') {
