@@ -403,9 +403,20 @@
     .dash-row  { grid-template-columns: 1fr; gap: 14px; }
     .dash-row3 { grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid2     { grid-template-columns: 1fr 1fr; }
+
+    /* Tela de detalhe mais confortável no tablet */
+    .detail-header { flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+    .detail-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+    .grid-pauta { grid-template-columns: 1fr; gap: 14px; }
+    .section-card { margin-bottom: 14px; }
   }
 
   /* ── MOBILE  ≤ 768px ── */
+  @media (max-width: 1100px) {
+    /* Na visualização de reunião, empilha pauta e anotações em tablets */
+    .grid-pauta { grid-template-columns: 1fr; gap: 16px; }
+  }
+
   @media (max-width: 768px) {
     /* Header — duas linhas no mobile */
     #header {
@@ -1670,7 +1681,7 @@ function renderDetail(m) {
       </div>
     </div>
 
-    <div class="grid2 grid-pauta" style="margin-bottom:20px">
+    <div class="grid2 grid-pauta" style="margin-bottom:20px;align-items:start">
       <div class="section-card" style="margin-bottom:0">
         <div class="section-head">📋 Pauta / Objetivos</div>
         <div class="section-body">
