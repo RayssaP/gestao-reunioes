@@ -257,8 +257,8 @@
   .rt-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-bottom:1px solid var(--bg3); background:var(--bg2); flex:0 0 auto; }
   .rt-btn { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--bg3); border-radius:8px; background:var(--bg2); color:var(--text2); font-size:13px; font-family:var(--font-mono); }
   .rt-btn:hover { background:var(--bg3); }
-  .rt-stage { position:relative; flex:1 1 auto; min-height:180px; background:#fff; }
-  .rt-editor { position:relative; z-index:1; min-height:180px; height:100%; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; overflow:auto; background:transparent; }
+   .rt-stage { position:relative; flex:1 1 auto; min-height:180px; background:#fff; }
+  .rt-editor { position:relative; z-index:1; min-height:180px; height:auto; padding:12px 14px; outline:none; color:var(--text); line-height:1.7; font-size:15px; overflow:visible; background:transparent; }
   .rt-editor[data-placeholder]:empty:before { content: attr(data-placeholder); color: var(--text3); }
   .rt-editor ul, .rt-editor ol { padding-left: 22px; margin: 8px 0; }
   .rt-editor p { margin: 0 0 10px; }
@@ -2738,36 +2738,46 @@ function initInkCanvas(container, config) {
 
   function syncInkUI() {
     const toggleBtn = container.querySelector(`[data-ink-target="${target}"][data-ink-action="toggle"]`);
+    const eraserBtn = container.querySelector(`.ink-tool[data-ink-target="${target}"][data-ink-tool="eraser"]`);
     canvas.classList.toggle('ink-enabled', inkEnabled);
     editor.classList.toggle('ink-mode', inkEnabled);
     editor.contentEditable = inkEnabled ? 'false' : 'true';
     if (toggleBtn) toggleBtn.textContent = inkEnabled ? 'Desativar caneta' : 'Ativar caneta';
+    if (eraserBtn) eraserBtn.classList.toggle('ink-btn-active', currentTool === 'eraser');
   }
 
-  function drawStoredImage(dataUrl) {
+  function getStageSize() {
+    const width = Math.max(stage.clientWidth, editor.scrollWidth, 1);
+    const height = Math.max(stage.clientHeight, editor.scrollHeight, 180);
+    stage.style.height = `${height}px`;
+    return { width, height };
+  }
+
+  function drawStoredImage(dataUrl, width, height) {
     if (!dataUrl) return;
-    const rect = stage.getBoundingClientRect();
     const img = new Image();
     img.onload = () => {
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
     };
     img.src = dataUrl;
   }
 
   function resizeCanvas() {
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const rect = stage.getBoundingClientRect();
+    const size = getStageSize();
     const prev = formData[storageKey] || trimTransparentCanvas(canvas);
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    canvas.width = Math.max(1, Math.floor(size.width * ratio));
+    canvas.height = Math.max(1, Math.floor(size.height * ratio));
+    canvas.style.width = `${size.width}px`;
+    canvas.style.height = `${size.height}px`;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(ratio, ratio);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.imageSmoothingEnabled = true;
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    if (prev) drawStoredImage(prev);
+    ctx.clearRect(0, 0, size.width, size.height);
+    if (prev) drawStoredImage(prev, size.width, size.height);
   }
 
   function saveInk() {
@@ -2823,6 +2833,10 @@ function initInkCanvas(container, config) {
     drawing = false;
     canvas.releasePointerCapture?.(ev.pointerId);
     saveInk();
+    if (currentTool === 'eraser') {
+      currentTool = 'pen';
+      syncInkUI();
+    }
   }
 
   canvas.addEventListener('pointerdown', start);
@@ -2833,22 +2847,30 @@ function initInkCanvas(container, config) {
 
   container.querySelectorAll(`.ink-tool[data-ink-target="${target}"]`).forEach(btn => {
     btn.addEventListener('click', () => {
-      currentTool = btn.dataset.inkTool;
-      container.querySelectorAll(`.ink-tool[data-ink-target="${target}"]`).forEach(b => b.classList.remove('ink-btn-active'));
-      btn.classList.add('ink-btn-active');
+      const requestedTool = btn.dataset.inkTool || 'pen';
+      currentTool = currentTool === requestedTool ? 'pen' : requestedTool;
+      if (!inkEnabled) inkEnabled = true;
+      syncInkUI();
     });
   });
 
   container.querySelector(`[data-ink-target="${target}"][data-ink-action="toggle"]`)?.addEventListener('click', () => {
     inkEnabled = !inkEnabled;
+    if (!inkEnabled) currentTool = 'pen';
     syncInkUI();
     if (!inkEnabled) editor.focus();
   });
 
   container.querySelector(`[data-ink-target="${target}"][data-ink-action="clear"]`)?.addEventListener('click', () => {
-    const rect = stage.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    const size = getStageSize();
+    ctx.clearRect(0, 0, size.width, size.height);
     formData[storageKey] = '';
+    currentTool = 'pen';
+    syncInkUI();
+  });
+
+  editor.addEventListener('input', () => {
+    requestAnimationFrame(resizeCanvas);
   });
 
   resizeCanvas();
@@ -2856,6 +2878,7 @@ function initInkCanvas(container, config) {
   if (window.ResizeObserver) {
     const ro = new ResizeObserver(() => resizeCanvas());
     ro.observe(stage);
+    ro.observe(editor);
   } else {
     window.addEventListener('resize', resizeCanvas, { passive: true });
   }
