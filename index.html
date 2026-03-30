@@ -2932,74 +2932,106 @@ function renderDashboard() {
   <div class="dash-row dash-animate">
     <div class="dash-column">
       <div class="dash-card">
-      <div class="dash-card-head">Status das reuniões</div>
-      <div class="dash-card-body">
-        ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
-        <div class="donut-wrap">
-          ${(() => {
-            const size = 88, cx = 44, cy = 44, r = 34, stroke = 10;
-            const circ = 2 * Math.PI * r;
-            let offset = 0;
-            const data = [
-              { label:'Realizada', v: realizadas, color:'#22C55E' },
-              { label:'Agendada', v: agendadas, color:'#3B82F6' },
-              { label:'Adiada', v: adiadas, color:'#F59E0B' },
-              { label:'Cancelada', v: canceladas, color:'#EF4444' }
-            ];
-            const slices = data.filter(d=>d.v>0).map(d => {
-              const frac = total > 0 ? d.v / total : 0;
-              const dash = frac * circ;
-              const gap = circ - dash;
-              const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
-              offset += frac * circ;
-              return s;
-            }).join('');
-            return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
-          })()}
-          <div class="donut-legend">
-            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></button>
-            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></button>
-            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></button>
-            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></button>
-          </div>
+        <div class="dash-card-head">Status das reuniões</div>
+        <div class="dash-card-body">
+          ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
+          <div class="donut-wrap">
+            ${(() => {
+              const size = 88, cx = 44, cy = 44, r = 34, stroke = 10;
+              const circ = 2 * Math.PI * r;
+              let offset = 0;
+              const data = [
+                { label:'Realizada', v: realizadas, color:'#22C55E' },
+                { label:'Agendada', v: agendadas, color:'#3B82F6' },
+                { label:'Adiada', v: adiadas, color:'#F59E0B' },
+                { label:'Cancelada', v: canceladas, color:'#EF4444' }
+              ];
+              const slices = data.filter(d=>d.v>0).map(d => {
+                const frac = total > 0 ? d.v / total : 0;
+                const dash = frac * circ;
+                const gap = circ - dash;
+                const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+                offset += frac * circ;
+                return s;
+              }).join('');
+              return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
+            })()}
+            <div class="donut-legend">
+              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></button>
+              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></button>
+              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></button>
+              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></button>
+            </div>
+          </div>`}
         </div>
+      </div>
+
       <div class="dash-card">
-      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico anual + visão mensal</span></div>
-      <div class="dash-card-body">
-        ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-          <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              ${availableYears.map(year => `
-                <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year}</button>
-              `).join('')}
+        <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico anual + visão mensal</span></div>
+        <div class="dash-card-body">
+          ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
+            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${availableYears.map(year => `
+                  <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year}</button>
+                `).join('')}
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'all' ? 'active' : ''}" data-dash-type-filter="all">Todas</button>
+                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'done' ? 'active' : ''}" data-dash-type-filter="done">Realizadas</button>
+                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
+              </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'all' ? 'active' : ''}" data-dash-type-filter="all">Todas</button>
-              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'done' ? 'active' : ''}" data-dash-type-filter="done">Realizadas</button>
-              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
+            <div style="margin-bottom:18px">
+              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
+              <div class="year-bars">
+                ${yearEntries.map(([year,count]) => `
+                  <div class="year-col">
+                    <div class="year-count">${count}</div>
+                    <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
+                    <div class="year-label">${year}</div>
+                  </div>`).join('')}
+              </div>
             </div>
-          </div>
-    </div>
-    <div class="dash-column">
-      <div class="dash-card">
-      <div class="dash-card-head">Principais órgãos</div>
-      <div class="dash-card-body">
-        ${orgs.length === 0 ? '<div class="dash-card-empty">Nenhum órgão registrado</div>' :
-          orgs.slice(0, 7).map(([name, count]) => `
-            <div class="org-item">
-              <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
-              <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
-            </div>`).join('')}
+            <div>
+              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês em ${dashboardMonthlyYear}</div>
+              <div class="month-bars-grid">
+                ${monthEntries.map(([,meta]) => `
+                  <div class="month-col">
+                    <div class="year-count">${meta.count}</div>
+                    <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:#3B82F6"></div>
+                    <div class="month-label">${meta.label}</div>
+                  </div>`).join('')}
+              </div>
+            </div>`}
+        </div>
       </div>
     </div>
+
+    <div class="dash-column">
       <div class="dash-card">
-      <div class="dash-card-head">Parecer da UTD</div>
-      <div class="dash-card-body">
-        ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
-          ${parecerEntries.map(([label,count]) => `
-            <div class="parecer-row">
-              <div class="parecer-name">${escHtml(label)}</div>
-              <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
+        <div class="dash-card-head">Principais órgãos</div>
+        <div class="dash-card-body">
+          ${orgs.length === 0 ? '<div class="dash-card-empty">Nenhum órgão registrado</div>' :
+            orgs.slice(0, 7).map(([name, count]) => `
+              <div class="org-item">
+                <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
+                <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
+              </div>`).join('')}
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-head">Parecer da UTD</div>
+        <div class="dash-card-body">
+          ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
+            ${parecerEntries.map(([label,count]) => `
+              <div class="parecer-row">
+                <div class="parecer-name">${escHtml(label)}</div>
+                <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
+                <div class="parecer-value">${count}</div>
+              </div>`).join('')}`}
+        </div>
+      </div>
     </div>
   </div>`;
 
