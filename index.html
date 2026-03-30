@@ -2746,6 +2746,30 @@ function renderDashboard() {
   const yearEntries = Object.entries(yearMap).sort((a,b) => a[0].localeCompare(b[0]));
   const maxYear = Math.max(1, ...yearEntries.map(([,count]) => count));
 
+  const monthNamesShort = ['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
+  const baseMonth = new Date();
+  baseMonth.setDate(1);
+  baseMonth.setHours(0,0,0,0);
+  const rollingMonthEntries = [];
+  for (let offset = -6; offset <= 6; offset++) {
+    const d = new Date(baseMonth);
+    d.setMonth(d.getMonth() + offset);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${monthNamesShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
+    rollingMonthEntries.push([key, { label, count: 0, isCurrent: offset === 0 }]);
+  }
+  const rollingMonthMap = Object.fromEntries(rollingMonthEntries);
+  meetings.forEach(m => {
+    const raw = m.date || m.createdAt;
+    if (!raw) return;
+    const d = new Date(raw);
+    if (isNaN(d)) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (rollingMonthMap[key]) rollingMonthMap[key].count += 1;
+  });
+  const monthEntries = rollingMonthEntries.map(([key, meta]) => [key, rollingMonthMap[key] || meta]);
+  const maxMonth = Math.max(1, ...monthEntries.map(([,meta]) => meta.count));
+
   const parecerMap = {
     'Aderente ao contrato': 0,
     'Parcialmente Aderente': 0,
@@ -2753,7 +2777,7 @@ function renderDashboard() {
     'Não informado': 0
   };
   meetings.forEach(m => {
-    const p = (m.kickoff && m.kickoff.parecerUtd) ? m.kickoff.parecerUtd : '';
+    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
     if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
     else parecerMap['Não informado'] += 1;
   });
@@ -2870,16 +2894,30 @@ function renderDashboard() {
       </div>
     </div>
     <div class="dash-card">
-      <div class="dash-card-head">Reuniões por ano <span style="font-size:11px;font-weight:400">histórico completo</span></div>
+      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico + janela móvel</span></div>
       <div class="dash-card-body">
         ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-          <div class="year-bars">
-            ${yearEntries.map(([year,count]) => `
-              <div class="year-col">
-                <div class="year-count">${count}</div>
-                <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
-                <div class="year-label">${year}</div>
-              </div>`).join('')}
+          <div style="margin-bottom:16px">
+            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
+            <div class="year-bars">
+              ${yearEntries.map(([year,count]) => `
+                <div class="year-col">
+                  <div class="year-count">${count}</div>
+                  <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
+                  <div class="year-label">${year}</div>
+                </div>`).join('')}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
+            <div class="year-bars">
+              ${monthEntries.map(([,meta]) => `
+                <div class="year-col">
+                  <div class="year-count">${meta.count}</div>
+                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
+                  <div class="year-label">${meta.label}</div>
+                </div>`).join('')}
+            </div>
           </div>`}
       </div>
     </div>
