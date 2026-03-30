@@ -343,6 +343,9 @@
   .donut-wrap { display: flex; align-items: center; gap: 20px; }
   .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+  .clickable-status { cursor: pointer; border-radius: 10px; padding: 6px 8px; transition: background .18s ease, transform .18s ease; }
+  .clickable-status:hover { background: rgba(148,163,184,.12); transform: translateY(-1px); }
+  .dash-column { display:flex; flex-direction:column; gap:20px; }
   .donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   /* Upcoming badge */
   .upcoming-item { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.07); cursor: pointer; }
@@ -2927,7 +2930,8 @@ function renderDashboard() {
   </div>
 
   <div class="dash-row dash-animate">
-    <div class="dash-card">
+    <div class="dash-column">
+      <div class="dash-card">
       <div class="dash-card-head">Status das reuniões</div>
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
@@ -2953,15 +2957,13 @@ function renderDashboard() {
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
           })()}
           <div class="donut-legend">
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
+            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></button>
+            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></button>
+            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></button>
+            <button type="button" class="donut-legend-item clickable-status" data-status-filter="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></button>
           </div>
-        </div>`}
-      </div>
-    </div>
-    <div class="dash-card">
+        </div>
+      <div class="dash-card">
       <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico anual + visão mensal</span></div>
       <div class="dash-card-body">
         ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
@@ -2977,34 +2979,9 @@ function renderDashboard() {
               <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
             </div>
           </div>
-          <div style="margin-bottom:18px">
-            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
-            <div class="year-bars">
-              ${yearEntries.map(([year,count]) => `
-                <div class="year-col">
-                  <div class="year-count">${count}</div>
-                  <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
-                  <div class="year-label">${year}</div>
-                </div>`).join('')}
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês em ${dashboardMonthlyYear}</div>
-            <div class="month-bars-grid">
-              ${monthEntries.map(([,meta]) => `
-                <div class="month-col">
-                  <div class="year-count">${meta.count}</div>
-                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:#3B82F6"></div>
-                  <div class="month-label">${meta.label}</div>
-                </div>`).join('')}
-            </div>
-          </div>`}
-      </div>
     </div>
-  </div>
-
-  <div class="dash-row dash-animate">
-    <div class="dash-card">
+    <div class="dash-column">
+      <div class="dash-card">
       <div class="dash-card-head">Principais órgãos</div>
       <div class="dash-card-body">
         ${orgs.length === 0 ? '<div class="dash-card-empty">Nenhum órgão registrado</div>' :
@@ -3015,7 +2992,7 @@ function renderDashboard() {
             </div>`).join('')}
       </div>
     </div>
-    <div class="dash-card">
+      <div class="dash-card">
       <div class="dash-card-head">Parecer da UTD</div>
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
@@ -3023,9 +3000,6 @@ function renderDashboard() {
             <div class="parecer-row">
               <div class="parecer-name">${escHtml(label)}</div>
               <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
-              <div class="parecer-value">${count}</div>
-            </div>`).join('')}`}
-      </div>
     </div>
   </div>`;
 
@@ -3049,6 +3023,15 @@ function renderDashboard() {
       } else if (key === 'overdue') {
         openDashboardListModal('Encaminhamentos vencidos', renderActionsList(vencidosList));
       }
+    });
+  });
+
+  el.querySelectorAll('[data-status-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const status = btn.dataset.statusFilter;
+      const list = meetingsSorted.filter(m => (m.status || 'Não definido') === status);
+      const titles = { Realizada:'Reuniões realizadas', Agendada:'Reuniões agendadas', Adiada:'Reuniões adiadas', Cancelada:'Reuniões canceladas' };
+      openDashboardListModal(titles[status] || `Reuniões ${status}`, renderMeetingList(list));
     });
   });
 
