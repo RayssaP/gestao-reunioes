@@ -2983,14 +2983,11 @@ function renderDashboard() {
               </div>
             </div>
             <div style="margin-bottom:18px">
-              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
-              <div class="year-bars">
+              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Anos disponíveis</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
                 ${yearEntries.map(([year,count]) => `
-                  <div class="year-col">
-                    <div class="year-count">${count}</div>
-                    <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
-                    <div class="year-label">${year}</div>
-                  </div>`).join('')}
+                  <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year} <span style="opacity:.8">(${count})</span></button>
+                `).join('')}
               </div>
             </div>
             <div>
