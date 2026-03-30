@@ -2731,12 +2731,25 @@ function renderDashboard() {
   meetings.forEach(m => (m.participants || []).forEach(p => {
     const org = (p.org || '').trim();
     if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
-    const key = (p.email || p.name || '').trim().toLowerCase();
+    const email = (p.email || '').trim();
+    const phone = (p.phone || p.celular || p.telefone || p.mobile || p.whatsapp || '').trim();
+    const normalizedPhone = phone.replace(/\D/g, '');
+    const nameKey = (p.name || '').trim().toLowerCase();
+    const key = (email || normalizedPhone || nameKey || '').trim().toLowerCase();
     if (!key) return;
     if (!peopleMap.has(key)) {
-      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
+      peopleMap.set(key, {
+        name: (p.name || p.email || 'Sem nome').trim(),
+        email,
+        phone,
+        orgs: new Set(),
+        count: 0,
+        meetings: []
+      });
     }
     const person = peopleMap.get(key);
+    if (!person.email && email) person.email = email;
+    if (!person.phone && phone) person.phone = phone;
     if (org) person.orgs.add(org);
     person.count += 1;
     person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
@@ -2799,8 +2812,39 @@ function renderDashboard() {
     'Não Aderente': 0,
     'Não informado': 0
   };
+  function extractMeetingParecer(meeting) {
+    const candidates = [
+      meeting?.kickoff?.parecer,
+      meeting?.kickoff?.parecerUtd,
+      meeting?.kickoff?.parecerUTD,
+      meeting?.kickoff?.utdParecer,
+      meeting?.parecer,
+      meeting?.parecerUtd,
+      meeting?.parecerUTD,
+      meeting?.utdParecer
+    ].filter(Boolean);
+    const normalizeParecer = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const lower = raw.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (lower.includes('aderente ao contrato')) return 'Aderente ao contrato';
+      if (lower.includes('parcialmente aderente')) return 'Parcialmente Aderente';
+      if (lower === 'nao aderente' || lower.includes('nao aderente')) return 'Não Aderente';
+      if (lower.includes('nao informado')) return 'Não informado';
+      return raw;
+    };
+    for (const c of candidates) {
+      const normalized = normalizeParecer(c);
+      if (Object.prototype.hasOwnProperty.call(parecerMap, normalized)) return normalized;
+    }
+    return '';
+  }
   meetings.forEach(m => {
-    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
+    const p = extractMeetingParecer(m);
     if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
     else parecerMap['Não informado'] += 1;
   });
@@ -2844,6 +2888,7 @@ function renderDashboard() {
         <div class="dash-list-item">
           <div class="dash-list-title">👤 ${escHtml(person.name)}</div>
           <div class="dash-list-line"><strong>E-mail:</strong> ${escHtml(person.email || 'Não informado')}</div>
+          <div class="dash-list-line"><strong>Celular:</strong> ${escHtml(person.phone || 'Não informado')}</div>
           <div class="dash-list-line"><strong>Órgãos:</strong> ${escHtml([...person.orgs].sort((a,b)=>a.localeCompare(b,'pt-BR')).join(', ') || 'Não informado')} · <strong>Participações:</strong> ${person.count}</div>
         </div>`).join('')}</div>`
     : '<div class="dash-modal-empty">Nenhuma pessoa registrada.</div>';
