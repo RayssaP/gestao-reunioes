@@ -746,6 +746,16 @@ body.dark .rt-editor { background:transparent !important; }
 .mini-filter-btn{border:1px solid var(--line);background:var(--bg2);color:var(--text2);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:.2s ease}
 .mini-filter-btn:hover{border-color:var(--accent);color:var(--text)}
 .mini-filter-btn.active{background:rgba(59,130,246,.16);border-color:#3B82F6;color:#DBEAFE}
+.year-filter-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:150px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:#F8FAFC;color:var(--text2);cursor:pointer;transition:.18s ease;box-shadow:0 1px 0 rgba(15,23,42,.03)}
+.year-filter-btn:hover{transform:translateY(-1px);border-color:#CBD5E1;background:#FFFFFF}
+.year-filter-btn.active{background:#E8F0FF;border-color:#8DB3FF;box-shadow:0 0 0 2px rgba(59,130,246,.08) inset}
+.year-filter-btn__year{font-weight:800;font-size:16px;color:var(--text)}
+.year-filter-btn__count{font-size:12px;color:var(--text3);font-family:var(--font-mono)}
+.year-filter-btn.active .year-filter-btn__year{color:#1D4ED8}
+.year-filter-btn.active .year-filter-btn__count{color:#1E40AF}
+.parecer-row.clickable{cursor:pointer}
+.parecer-row.clickable:hover .parecer-name{text-decoration:underline}
+
 @media (max-width: 900px){.month-bars-grid{grid-template-columns:repeat(6,minmax(0,1fr));}}
 @media (max-width: 560px){.month-bars-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
 
@@ -2791,7 +2801,7 @@ function renderDashboard() {
     const d = new Date(raw);
     return isNaN(d) ? null : String(d.getFullYear());
   }).filter(Boolean)])).sort((a,b) => Number(b) - Number(a));
-  if (!availableYears.includes(dashboardMonthlyYear)) dashboardMonthlyYear = currentYear;
+  if (!availableYears.includes(dashboardMonthlyYear)) dashboardMonthlyYear = availableYears.includes(currentYear) ? currentYear : (yearEntries[0]?.[0] || currentYear);
 
   const monthlyMap = {};
   for (let month = 0; month < 12; month++) {
@@ -2967,27 +2977,26 @@ function renderDashboard() {
       </div>
 
       <div class="dash-card">
-        <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico anual + visão mensal</span></div>
+        <div class="dash-card-head">Visão mensal x ano <span style="font-size:11px;font-weight:400">filtro anual + visão mensal</span></div>
         <div class="dash-card-body">
           ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px">
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                ${availableYears.map(year => `
-                  <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year}</button>
-                `).join('')}
+            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+              <div style="flex:1 1 320px;min-width:260px">
+                <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Ano selecionado</div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                  ${yearEntries.map(([year,count]) => `
+                    <button type="button" class="year-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}" aria-pressed="${dashboardMonthlyYear === year ? 'true' : 'false'}">
+                      <span class="year-filter-btn__year">${year}</span>
+                      <span class="year-filter-btn__count">${count} reunião${count > 1 ? 'ões' : ''}</span>
+                    </button>
+                  `).join('')}
+                </div>
+                <div style="margin-top:10px;font-size:13px;color:var(--text2)">Exibindo os meses de <strong>${dashboardMonthlyYear}</strong>.</div>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
                 <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'all' ? 'active' : ''}" data-dash-type-filter="all">Todas</button>
                 <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'done' ? 'active' : ''}" data-dash-type-filter="done">Realizadas</button>
                 <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
-              </div>
-            </div>
-            <div style="margin-bottom:18px">
-              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Anos disponíveis</div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                ${yearEntries.map(([year,count]) => `
-                  <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year} <span style="opacity:.8">(${count})</span></button>
-                `).join('')}
               </div>
             </div>
             <div>
@@ -3022,7 +3031,7 @@ function renderDashboard() {
         <div class="dash-card-body">
           ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
             ${parecerEntries.map(([label,count]) => `
-              <div class="parecer-row">
+              <div class="parecer-row clickable" data-parecer-filter="${escHtml(label)}">
                 <div class="parecer-name">${escHtml(label)}</div>
                 <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
                 <div class="parecer-value">${count}</div>
@@ -3061,6 +3070,18 @@ function renderDashboard() {
       const list = meetingsSorted.filter(m => (m.status || 'Não definido') === status);
       const titles = { Realizada:'Reuniões realizadas', Agendada:'Reuniões agendadas', Adiada:'Reuniões adiadas', Cancelada:'Reuniões canceladas' };
       openDashboardListModal(titles[status] || `Reuniões ${status}`, renderMeetingList(list));
+    });
+  });
+
+
+  el.querySelectorAll('[data-parecer-filter]').forEach(row => {
+    row.addEventListener('click', () => {
+      const label = row.dataset.parecerFilter;
+      const list = meetingsSorted.filter(m => {
+        const p = extractMeetingParecer(m);
+        return label === 'Não informado' ? !p || p === 'Não informado' : p === label;
+      });
+      openDashboardListModal(`Reuniões com parecer: ${label}`, renderMeetingList(list));
     });
   });
 
