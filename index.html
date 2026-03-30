@@ -736,6 +736,16 @@ body.dark .rt-editor { background:transparent !important; }
   .parecer-value { width:26px; text-align:right; font-size:13px; color:#1E293B; font-weight:700; }
   @media (max-width: 760px) { .parecer-row { align-items:flex-start; flex-direction:column; gap:6px; } .parecer-name { width:100%; max-width:none; } .parecer-value { width:auto; } }
 
+
+.month-bars-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;align-items:end}
+.month-col{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.month-label{font-size:10px;color:var(--text3);font-family:var(--font-mono);text-align:center;line-height:1.2;word-break:break-word}
+.mini-filter-btn{border:1px solid var(--line);background:var(--bg2);color:var(--text2);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:.2s ease}
+.mini-filter-btn:hover{border-color:var(--accent);color:var(--text)}
+.mini-filter-btn.active{background:rgba(59,130,246,.16);border-color:#3B82F6;color:#DBEAFE}
+@media (max-width: 900px){.month-bars-grid{grid-template-columns:repeat(6,minmax(0,1fr));}}
+@media (max-width: 560px){.month-bars-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
+
 </style>
 </head>
 <body>
@@ -2691,6 +2701,16 @@ function openDashboardListModal(title, bodyHtml) {
   });
 }
 
+
+let dashboardMonthlyYear = String(new Date().getFullYear());
+let dashboardMeetingTypeFilter = 'all';
+
+function getTimelineFilteredMeetings(list) {
+  if (dashboardMeetingTypeFilter === 'done') return list.filter(m => m.status === 'Realizada');
+  if (dashboardMeetingTypeFilter === 'pending') return list.filter(m => m.status !== 'Realizada');
+  return list;
+}
+
 function renderDashboard() {
   const el = document.getElementById('dashboard-content');
   if (!el) return;
@@ -2734,8 +2754,9 @@ function renderDashboard() {
   const vencidosList = pendentesList.filter(a => a.deadline && new Date(a.deadline) < hoje)
     .sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
 
+  const timelineMeetings = getTimelineFilteredMeetings(meetings);
   const yearMap = {};
-  meetings.forEach(m => {
+  timelineMeetings.forEach(m => {
     const raw = m.date || m.createdAt;
     if (!raw) return;
     const d = new Date(raw);
@@ -2747,27 +2768,29 @@ function renderDashboard() {
   const maxYear = Math.max(1, ...yearEntries.map(([,count]) => count));
 
   const monthNamesShort = ['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
-  const baseMonth = new Date();
-  baseMonth.setDate(1);
-  baseMonth.setHours(0,0,0,0);
-  const rollingMonthEntries = [];
-  for (let offset = -6; offset <= 6; offset++) {
-    const d = new Date(baseMonth);
-    d.setMonth(d.getMonth() + offset);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const label = `${monthNamesShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
-    rollingMonthEntries.push([key, { label, count: 0, isCurrent: offset === 0 }]);
+  const currentYear = String(new Date().getFullYear());
+  const previousYear = String(Number(currentYear) - 1);
+  const availableYears = Array.from(new Set([currentYear, previousYear, ...timelineMeetings.map(m => {
+    const raw = m.date || m.createdAt;
+    const d = new Date(raw);
+    return isNaN(d) ? null : String(d.getFullYear());
+  }).filter(Boolean)])).sort((a,b) => Number(b) - Number(a));
+  if (!availableYears.includes(dashboardMonthlyYear)) dashboardMonthlyYear = currentYear;
+
+  const monthlyMap = {};
+  for (let month = 0; month < 12; month++) {
+    const key = `${dashboardMonthlyYear}-${String(month+1).padStart(2,'0')}`;
+    monthlyMap[key] = { label: `${monthNamesShort[month]} ${String(dashboardMonthlyYear).slice(-2)}`, count: 0, monthIndex: month };
   }
-  const rollingMonthMap = Object.fromEntries(rollingMonthEntries);
-  meetings.forEach(m => {
+  timelineMeetings.forEach(m => {
     const raw = m.date || m.createdAt;
     if (!raw) return;
     const d = new Date(raw);
     if (isNaN(d)) return;
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (rollingMonthMap[key]) rollingMonthMap[key].count += 1;
+    if (monthlyMap[key]) monthlyMap[key].count += 1;
   });
-  const monthEntries = rollingMonthEntries.map(([key, meta]) => [key, rollingMonthMap[key] || meta]);
+  const monthEntries = Object.entries(monthlyMap).sort((a,b) => a[0].localeCompare(b[0]));
   const maxMonth = Math.max(1, ...monthEntries.map(([,meta]) => meta.count));
 
   const parecerMap = {
@@ -2894,10 +2917,22 @@ function renderDashboard() {
       </div>
     </div>
     <div class="dash-card">
-      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico + janela móvel</span></div>
+      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico anual + visão mensal</span></div>
       <div class="dash-card-body">
         ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-          <div style="margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${availableYears.map(year => `
+                <button type="button" class="mini-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}">${year}</button>
+              `).join('')}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'all' ? 'active' : ''}" data-dash-type-filter="all">Todas</button>
+              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'done' ? 'active' : ''}" data-dash-type-filter="done">Realizadas</button>
+              <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
+            </div>
+          </div>
+          <div style="margin-bottom:18px">
             <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
             <div class="year-bars">
               ${yearEntries.map(([year,count]) => `
@@ -2909,13 +2944,13 @@ function renderDashboard() {
             </div>
           </div>
           <div>
-            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
-            <div class="year-bars">
+            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês em ${dashboardMonthlyYear}</div>
+            <div class="month-bars-grid">
               ${monthEntries.map(([,meta]) => `
-                <div class="year-col">
+                <div class="month-col">
                   <div class="year-count">${meta.count}</div>
-                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
-                  <div class="year-label">${meta.label}</div>
+                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:#3B82F6"></div>
+                  <div class="month-label">${meta.label}</div>
                 </div>`).join('')}
             </div>
           </div>`}
@@ -2969,6 +3004,20 @@ function renderDashboard() {
       } else if (key === 'overdue') {
         openDashboardListModal('Encaminhamentos vencidos', renderActionsList(vencidosList));
       }
+    });
+  });
+
+  el.querySelectorAll('[data-dash-year]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dashboardMonthlyYear = btn.dataset.dashYear;
+      renderDashboard();
+    });
+  });
+
+  el.querySelectorAll('[data-dash-type-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dashboardMeetingTypeFilter = btn.dataset.dashTypeFilter;
+      renderDashboard();
     });
   });
 }
