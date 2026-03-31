@@ -3257,8 +3257,7 @@ function exportAllContactsData() {
     c.reunioes.join(' | '),
     c.datas_reunioes.join(' | ')
   ]);
-  const csv = [header, ...rows].map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';')).join('
-');
+  const csv = [header, ...rows].map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';')).join('\n');
   downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }), `contatos_gerais_${new Date().toISOString().slice(0,10)}.csv`);
   showToast(`📇 ${allContacts.length} contato(s) exportados!`);
 }
