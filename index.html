@@ -736,6 +736,24 @@ body.dark .rt-editor { background:transparent !important; }
   .parecer-value { width:26px; text-align:right; font-size:13px; color:#1E293B; font-weight:700; }
   @media (max-width: 760px) { .parecer-row { align-items:flex-start; flex-direction:column; gap:6px; } .parecer-name { width:100%; max-width:none; } .parecer-value { width:auto; } }
 
+
+  .dash-filter-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .year-filter-card { background:var(--bg2); border:1px solid var(--bg3); border-radius:12px; padding:12px 14px; min-width:110px; cursor:pointer; transition:all .18s ease; }
+  .year-filter-card:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.08); border-color:#93C5FD; }
+  .year-filter-card.active { border-color:#3B82F6; background:#EFF6FF; }
+  .year-filter-top { font-size:11px; color:var(--text3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .year-filter-value { font-size:22px; font-weight:700; color:#1E293B; line-height:1; }
+  .year-filter-sub { font-size:12px; color:var(--text2); margin-top:6px; }
+  .month-bars { display:flex; align-items:flex-end; gap:8px; height:170px; margin-top:4px; }
+  .month-col { flex:1; min-width:42px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .month-count { font-size:11px; color:var(--text2); font-family:var(--font-mono); }
+  .month-bar { width:100%; max-width:56px; border-radius:10px 10px 0 0; background:#3B82F6; min-height:8px; }
+  .month-label { font-size:11px; color:var(--text3); font-family:var(--font-mono); text-align:center; }
+  .clickable-chart-item { cursor:pointer; transition:transform .16s ease, opacity .16s ease; }
+  .clickable-chart-item:hover { transform:translateY(-1px); opacity:.92; }
+  .clickable-row { cursor:pointer; transition:transform .16s ease, background .16s ease; border-radius:10px; padding:6px 4px; }
+  .clickable-row:hover { transform:translateY(-1px); background:rgba(59,130,246,.06); }
+
 </style>
 </head>
 <body>
@@ -1073,6 +1091,7 @@ let searchText = '';
 let formData = {};
 let formTab = 'geral';
 let deleteTarget = null;
+let dashboardYearFilter = 'all';
 
 // ===== GOOGLE DRIVE — GOOGLE IDENTITY SERVICES + DRIVE API =====
 // Requer hospedagem em https:// com Client ID OAuth de Aplicativo da Web.
@@ -2691,16 +2710,53 @@ function openDashboardListModal(title, bodyHtml) {
   });
 }
 
+
 function renderDashboard() {
   const el = document.getElementById('dashboard-content');
   if (!el) return;
 
-  const total = meetings.length;
-  const meetingsSorted = [...meetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-  const realizadasList = meetings.filter(m => m.status === 'Realizada');
-  const agendadasList  = meetings.filter(m => m.status === 'Agendada');
-  const canceladasList = meetings.filter(m => m.status === 'Cancelada');
-  const adiadasList    = meetings.filter(m => m.status === 'Adiada');
+  const getMeetingDate = (m) => {
+    const raw = m.date || m.createdAt;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return isNaN(d) ? null : d;
+  };
+  const getMeetingYear = (m) => {
+    const d = getMeetingDate(m);
+    return d ? String(d.getFullYear()) : '';
+  };
+  const normalizeParecer = (raw) => {
+    const value = String(raw || '').trim().toLowerCase();
+    if (!value) return 'Não informado';
+    if (['aderente', 'aderente_ao_contrato', 'aderente ao contrato'].includes(value)) return 'Aderente';
+    if (['parcialmente_aderente', 'parcialmente aderente'].includes(value)) return 'Parcialmente Aderente';
+    if (['nao_aderente', 'não_aderente', 'nao aderente', 'não aderente'].includes(value)) return 'Não Aderente';
+    if (value === 'não informado' || value === 'nao informado') return 'Não informado';
+    return 'Não informado';
+  };
+
+  const yearMapAll = {};
+  meetings.forEach(m => {
+    const year = getMeetingYear(m);
+    if (year) yearMapAll[year] = (yearMapAll[year] || 0) + 1;
+  });
+  const yearEntriesAll = Object.entries(yearMapAll).sort((a,b) => a[0].localeCompare(b[0]));
+  const availableYears = yearEntriesAll.map(([year]) => year);
+  if (dashboardYearFilter !== 'all' && !availableYears.includes(dashboardYearFilter)) {
+    dashboardYearFilter = 'all';
+  }
+
+  const filteredMeetings = dashboardYearFilter === 'all'
+    ? [...meetings]
+    : meetings.filter(m => getMeetingYear(m) === dashboardYearFilter);
+
+  const total = filteredMeetings.length;
+  const meetingsSorted = [...filteredMeetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+
+  const realizadasList = filteredMeetings.filter(m => m.status === 'Realizada');
+  const agendadasList  = filteredMeetings.filter(m => m.status === 'Agendada');
+  const canceladasList = filteredMeetings.filter(m => m.status === 'Cancelada');
+  const adiadasList    = filteredMeetings.filter(m => m.status === 'Adiada');
   const realizadas = realizadasList.length;
   const agendadas = agendadasList.length;
   const canceladas = canceladasList.length;
@@ -2708,7 +2764,7 @@ function renderDashboard() {
 
   const orgsMap = {};
   const peopleMap = new Map();
-  meetings.forEach(m => (m.participants || []).forEach(p => {
+  filteredMeetings.forEach(m => (m.participants || []).forEach(p => {
     const org = (p.org || '').trim();
     if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
     const key = (p.email || p.name || '').trim().toLowerCase();
@@ -2725,7 +2781,7 @@ function renderDashboard() {
   const uniquePeople = [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const allActions = [];
-  meetings.forEach(m => (m.actions || []).forEach(a => {
+  filteredMeetings.forEach(m => (m.actions || []).forEach(a => {
     allActions.push({ ...a, meeting: m.title || 'Sem título', meetingId: m.id });
   }));
   const pendentesList = allActions.filter(a => !a.done);
@@ -2734,59 +2790,36 @@ function renderDashboard() {
   const vencidosList = pendentesList.filter(a => a.deadline && new Date(a.deadline) < hoje)
     .sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
 
-  const yearMap = {};
-  meetings.forEach(m => {
-    const raw = m.date || m.createdAt;
-    if (!raw) return;
-    const d = new Date(raw);
-    if (isNaN(d)) return;
-    const year = String(d.getFullYear());
-    yearMap[year] = (yearMap[year] || 0) + 1;
-  });
-  const yearEntries = Object.entries(yearMap).sort((a,b) => a[0].localeCompare(b[0]));
-  const maxYear = Math.max(1, ...yearEntries.map(([,count]) => count));
-
   const monthNamesShort = ['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
-  const baseMonth = new Date();
-  baseMonth.setDate(1);
-  baseMonth.setHours(0,0,0,0);
-  const rollingMonthEntries = [];
-  for (let offset = -6; offset <= 6; offset++) {
-    const d = new Date(baseMonth);
-    d.setMonth(d.getMonth() + offset);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const label = `${monthNamesShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
-    rollingMonthEntries.push([key, { label, count: 0, isCurrent: offset === 0 }]);
-  }
-  const rollingMonthMap = Object.fromEntries(rollingMonthEntries);
-  meetings.forEach(m => {
-    const raw = m.date || m.createdAt;
-    if (!raw) return;
-    const d = new Date(raw);
-    if (isNaN(d)) return;
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (rollingMonthMap[key]) rollingMonthMap[key].count += 1;
+  const monthEntries = Array.from({ length: 12 }, (_, idx) => ({
+    key: String(idx + 1).padStart(2, '0'),
+    label: monthNamesShort[idx],
+    count: 0
+  }));
+  filteredMeetings.forEach(m => {
+    const d = getMeetingDate(m);
+    if (!d) return;
+    monthEntries[d.getMonth()].count += 1;
   });
-  const monthEntries = rollingMonthEntries.map(([key, meta]) => [key, rollingMonthMap[key] || meta]);
-  const maxMonth = Math.max(1, ...monthEntries.map(([,meta]) => meta.count));
+  const maxMonth = Math.max(1, ...monthEntries.map(meta => meta.count));
 
-  const parecerMap = {
-    'Aderente ao contrato': 0,
-    'Parcialmente Aderente': 0,
-    'Não Aderente': 0,
-    'Não informado': 0
-  };
-  meetings.forEach(m => {
-    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
-    if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
-    else parecerMap['Não informado'] += 1;
+  const parecerEntries = [
+    ['Aderente', 0],
+    ['Parcialmente Aderente', 0],
+    ['Não Aderente', 0],
+    ['Não informado', 0]
+  ];
+  const parecerIndex = Object.fromEntries(parecerEntries.map(([label], idx) => [label, idx]));
+  filteredMeetings.forEach(m => {
+    const p = normalizeParecer(m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd));
+    parecerEntries[parecerIndex[p]][1] += 1;
   });
-  const parecerEntries = Object.entries(parecerMap);
   const maxParecer = Math.max(1, ...parecerEntries.map(([,count]) => count));
 
   const hora = new Date().getHours();
   const saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const dateStr = new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const activeYearLabel = dashboardYearFilter === 'all' ? 'todos os anos' : dashboardYearFilter;
 
   const renderMeetingList = list => list.length
     ? `<div class="dash-list">${list.map(m => `
@@ -2831,12 +2864,26 @@ function renderDashboard() {
     <p>${dateStr}</p>
   </div>
 
+  <div class="dash-filter-row dash-animate">
+    <button class="year-filter-card ${dashboardYearFilter === 'all' ? 'active' : ''}" type="button" data-year-filter="all">
+      <div class="year-filter-top">Filtro do dashboard</div>
+      <div class="year-filter-value">${meetings.length}</div>
+      <div class="year-filter-sub">Todos os anos</div>
+    </button>
+    ${yearEntriesAll.map(([year,count]) => `
+      <button class="year-filter-card ${dashboardYearFilter === year ? 'active' : ''}" type="button" data-year-filter="${year}">
+        <div class="year-filter-top">Ano</div>
+        <div class="year-filter-value">${year}</div>
+        <div class="year-filter-sub">${count} reunião${count === 1 ? '' : 'ões'}</div>
+      </button>`).join('')}
+  </div>
+
   <div class="kpi-grid dash-animate">
     <div class="kpi-card kpi-accent-green clickable-kpi" data-kpi="meetings">
       <div class="kpi-icon">🗓️</div>
       <div class="kpi-value">${total}</div>
       <div class="kpi-label">Total de reuniões</div>
-      <div class="kpi-sub">${realizadas} realizadas</div>
+      <div class="kpi-sub">Filtro: ${escHtml(activeYearLabel)}</div>
     </div>
     <div class="kpi-card kpi-accent-purple clickable-kpi" data-kpi="orgsPeople">
       <div class="kpi-icon">🏛️</div>
@@ -2860,7 +2907,7 @@ function renderDashboard() {
 
   <div class="dash-row dash-animate">
     <div class="dash-card">
-      <div class="dash-card-head">Status das reuniões</div>
+      <div class="dash-card-head">Status das reuniões <span style="font-size:11px;font-weight:400">clique para listar</span></div>
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
         <div class="donut-wrap">
@@ -2878,46 +2925,32 @@ function renderDashboard() {
               const frac = total > 0 ? d.v / total : 0;
               const dash = frac * circ;
               const gap = circ - dash;
-              const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+              const s = `<circle class="clickable-chart-item" data-status-chart="${d.label}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
               offset += frac * circ;
               return s;
             }).join('');
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
           })()}
           <div class="donut-legend">
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
-            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
+            <div class="donut-legend-item clickable-chart-item" data-status-chart="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
+            <div class="donut-legend-item clickable-chart-item" data-status-chart="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
+            <div class="donut-legend-item clickable-chart-item" data-status-chart="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
+            <div class="donut-legend-item clickable-chart-item" data-status-chart="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
           </div>
         </div>`}
       </div>
     </div>
     <div class="dash-card">
-      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico + janela móvel</span></div>
+      <div class="dash-card-head">Reuniões por mês <span style="font-size:11px;font-weight:400">${dashboardYearFilter === 'all' ? 'todos os anos somados' : 'ano filtrado'}</span></div>
       <div class="dash-card-body">
-        ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-          <div style="margin-bottom:16px">
-            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
-            <div class="year-bars">
-              ${yearEntries.map(([year,count]) => `
-                <div class="year-col">
-                  <div class="year-count">${count}</div>
-                  <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
-                  <div class="year-label">${year}</div>
-                </div>`).join('')}
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
-            <div class="year-bars">
-              ${monthEntries.map(([,meta]) => `
-                <div class="year-col">
-                  <div class="year-count">${meta.count}</div>
-                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
-                  <div class="year-label">${meta.label}</div>
-                </div>`).join('')}
-            </div>
+        ${monthEntries.every(meta => meta.count === 0) ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
+          <div class="month-bars">
+            ${monthEntries.map(meta => `
+              <div class="month-col">
+                <div class="month-count">${meta.count}</div>
+                <div class="month-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*126))}px; opacity:${meta.count ? 1 : .28}; background:${dashboardYearFilter === 'all' ? '#3B82F6' : '#8B5CF6'}"></div>
+                <div class="month-label">${meta.label}</div>
+              </div>`).join('')}
           </div>`}
       </div>
     </div>
@@ -2936,11 +2969,11 @@ function renderDashboard() {
       </div>
     </div>
     <div class="dash-card">
-      <div class="dash-card-head">Parecer da UTD</div>
+      <div class="dash-card-head">Parecer da UTD <span style="font-size:11px;font-weight:400">clique para listar</span></div>
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
           ${parecerEntries.map(([label,count]) => `
-            <div class="parecer-row">
+            <div class="parecer-row clickable-row" data-parecer-row="${escHtml(label)}">
               <div class="parecer-name">${escHtml(label)}</div>
               <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
               <div class="parecer-value">${count}</div>
@@ -2949,13 +2982,20 @@ function renderDashboard() {
     </div>
   </div>`;
 
+  el.querySelectorAll('[data-year-filter]').forEach(card => {
+    card.addEventListener('click', () => {
+      dashboardYearFilter = card.dataset.yearFilter;
+      renderDashboard();
+    });
+  });
+
   el.querySelectorAll('[data-kpi]').forEach(card => {
     card.addEventListener('click', () => {
       const key = card.dataset.kpi;
       if (key === 'meetings') {
-        openDashboardListModal('Lista de reuniões', renderMeetingList(meetingsSorted));
+        openDashboardListModal(`Lista de reuniões (${activeYearLabel})`, renderMeetingList(meetingsSorted));
       } else if (key === 'orgsPeople') {
-        openDashboardListModal('Órgãos envolvidos e pessoas únicas', `
+        openDashboardListModal(`Órgãos envolvidos e pessoas únicas (${activeYearLabel})`, `
           <div class="dash-modal-section">
             <h4>Órgãos envolvidos (${orgs.length})</h4>
             ${orgsHtml}
@@ -2965,10 +3005,26 @@ function renderDashboard() {
             ${peopleHtml}
           </div>`);
       } else if (key === 'actions') {
-        openDashboardListModal('Todos os encaminhamentos', renderActionsList(allActions));
+        openDashboardListModal(`Todos os encaminhamentos (${activeYearLabel})`, renderActionsList(allActions));
       } else if (key === 'overdue') {
-        openDashboardListModal('Encaminhamentos vencidos', renderActionsList(vencidosList));
+        openDashboardListModal(`Encaminhamentos vencidos (${activeYearLabel})`, renderActionsList(vencidosList));
       }
+    });
+  });
+
+  el.querySelectorAll('[data-status-chart]').forEach(item => {
+    item.addEventListener('click', () => {
+      const status = item.dataset.statusChart;
+      const list = meetingsSorted.filter(m => (m.status || '') === status);
+      openDashboardListModal(`Reuniões com status "${status}" (${activeYearLabel})`, renderMeetingList(list));
+    });
+  });
+
+  el.querySelectorAll('[data-parecer-row]').forEach(row => {
+    row.addEventListener('click', () => {
+      const parecer = row.dataset.parecerRow;
+      const list = meetingsSorted.filter(m => normalizeParecer(m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) === parecer);
+      openDashboardListModal(`Reuniões com parecer "${parecer}" (${activeYearLabel})`, renderMeetingList(list));
     });
   });
 }
