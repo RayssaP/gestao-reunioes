@@ -468,8 +468,6 @@
     #btn-settings  { padding: 5px 8px; font-size: 13px; }
     .btn-label-cfg { display: none; }
     .btn-label-search { display: none; }
-    .btn-label-export-contacts { display: none; }
-    .btn-label-export-pdf { display: none; }
     #btn-new       { padding: 6px 10px; font-size: 18px; font-weight: 700; line-height: 1; }
     .btn-label-new { display: none; }
 
@@ -790,10 +788,7 @@ body.dark .rt-editor { background:transparent !important; }
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
-    <button class="btn btn-ghost" id="btn-header-export-contacts" title="Exportar contatos">📊 <span class="btn-label-export-contacts">Contatos</span></button>
-    <button class="btn btn-ghost" id="btn-header-export-meetings-pdf" title="Exportar reuniões em PDF">📄 <span class="btn-label-export-pdf">PDF</span></button>
-    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -2782,26 +2777,20 @@ function renderDashboard() {
 
   const orgsMap = {};
   const peopleMap = new Map();
-  filteredMeetings.forEach(m => {
-    const seenOrgsInMeeting = new Set();
-    (m.participants || []).forEach(p => {
-      const org = (p.org || '').trim();
-      if (org && !seenOrgsInMeeting.has(org)) {
-        orgsMap[org] = (orgsMap[org] || 0) + 1;
-        seenOrgsInMeeting.add(org);
-      }
-      const key = (p.email || p.name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!peopleMap.has(key)) {
-        peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), phone: (p.phone || '').trim(), orgs: new Set(), count: 0, meetings: [] });
-      }
-      const person = peopleMap.get(key);
-      if (org) person.orgs.add(org);
-      if (!person.phone && p.phone) person.phone = String(p.phone).trim();
-      person.count += 1;
-      person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '', status: m.status || '', location: m.location || '' });
-    });
-  });
+  filteredMeetings.forEach(m => (m.participants || []).forEach(p => {
+    const org = (p.org || '').trim();
+    if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
+    const key = (p.email || p.name || '').trim().toLowerCase();
+    if (!key) return;
+    if (!peopleMap.has(key)) {
+      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), phone: (p.phone || '').trim(), orgs: new Set(), count: 0, meetings: [] });
+    }
+    const person = peopleMap.get(key);
+    if (org) person.orgs.add(org);
+    if (!person.phone && p.phone) person.phone = String(p.phone).trim();
+    person.count += 1;
+    person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '', status: m.status || '', location: m.location || '' });
+  }));
   const orgs = Object.entries(orgsMap).sort((a,b) => b[1]-a[1]);
   const uniquePeople = [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 
@@ -2904,6 +2893,11 @@ function renderDashboard() {
       </button>`).join('')}
   </div>
 
+  <div class="dash-actions-row dash-animate">
+    <button class="btn btn-blue" type="button" id="btn-export-all-contacts">📊 Exportar contatos</button>
+    <button class="btn btn-ghost" type="button" id="btn-export-meetings-pdf">📄 Exportar reuniões em PDF</button>
+  </div>
+
   <div class="kpi-grid dash-animate">
     <div class="kpi-card kpi-accent-green clickable-kpi" data-kpi="meetings">
       <div class="kpi-icon">🗓️</div>
@@ -2933,7 +2927,7 @@ function renderDashboard() {
 
   <div class="dash-row dash-animate">
     <div class="dash-card">
-      <div class="dash-card-head">Status das reuniões <span style="font-size:11px;font-weight:400">clique na legenda para listar</span></div>
+      <div class="dash-card-head">Status das reuniões <span style="font-size:11px;font-weight:400">clique para listar</span></div>
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
         <div class="donut-wrap">
@@ -2951,11 +2945,11 @@ function renderDashboard() {
               const frac = total > 0 ? d.v / total : 0;
               const dash = frac * circ;
               const gap = circ - dash;
-              const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+              const s = `<circle class="clickable-chart-item" data-status-chart="${d.label}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
               offset += frac * circ;
               return s;
             }).join('');
-            return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#1E293B" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
+            return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
           })()}
           <div class="donut-legend">
             <div class="donut-legend-item clickable-chart-item" data-status-chart="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
@@ -3015,6 +3009,13 @@ function renderDashboard() {
       dashboardYearFilter = card.dataset.yearFilter;
       renderDashboard();
     });
+  });
+
+  el.querySelector('#btn-export-all-contacts')?.addEventListener('click', () => {
+    exportAllContactsCSV(uniquePeople, activeYearLabel);
+  });
+  el.querySelector('#btn-export-meetings-pdf')?.addEventListener('click', () => {
+    exportMeetingsListPDF(meetingsSorted, activeYearLabel);
   });
 
   el.querySelectorAll('[data-kpi]').forEach(card => {
@@ -3160,50 +3161,6 @@ function exportContactsCSV(m) {
   showToast(`📊 ${participants.length} contato(s) exportados!`);
 }
 
-function normalizeParecerValue(raw) {
-  const value = String(raw || '').trim().toLowerCase();
-  if (!value) return 'Não informado';
-  if (['aderente', 'aderente_ao_contrato', 'aderente ao contrato'].includes(value)) return 'Aderente';
-  if (['parcialmente_aderente', 'parcialmente aderente'].includes(value)) return 'Parcialmente Aderente';
-  if (['nao_aderente', 'não_aderente', 'nao aderente', 'não aderente'].includes(value)) return 'Não Aderente';
-  if (value === 'não informado' || value === 'nao informado') return 'Não informado';
-  return 'Não informado';
-}
-
-function getDashboardFilteredMeetings() {
-  const getMeetingDate = (m) => {
-    const raw = m.date || m.createdAt;
-    if (!raw) return null;
-    const d = new Date(raw);
-    return isNaN(d) ? null : d;
-  };
-  const getMeetingYear = (m) => {
-    const d = getMeetingDate(m);
-    return d ? String(d.getFullYear()) : '';
-  };
-  return dashboardYearFilter === 'all' ? [...meetings] : meetings.filter(m => getMeetingYear(m) === dashboardYearFilter);
-}
-
-function buildUniquePeopleFromMeetings(meetingList) {
-  const peopleMap = new Map();
-  meetingList.forEach(m => {
-    (m.participants || []).forEach(p => {
-      const org = (p.org || '').trim();
-      const key = (p.email || p.name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!peopleMap.has(key)) {
-        peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), phone: (p.phone || '').trim(), orgs: new Set(), count: 0, meetings: [] });
-      }
-      const person = peopleMap.get(key);
-      if (org) person.orgs.add(org);
-      if (!person.phone && p.phone) person.phone = String(p.phone).trim();
-      person.count += 1;
-      person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '', status: m.status || '', location: m.location || '' });
-    });
-  });
-  return [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
-}
-
 function exportAllContactsCSV(uniquePeople, activeYearLabel = 'todos_os_anos') {
   if (!uniquePeople || uniquePeople.length === 0) {
     showToast('Nenhum contato para exportar.', 'info');
@@ -3260,7 +3217,7 @@ function exportMeetingsListPDF(meetingList, activeYearLabel = 'todos os anos') {
     showToast('Nenhuma reunião para exportar.', 'info');
     return;
   }
-  const normalizeParecerForExport = (meeting) => normalizeParecerValue(meeting?.kickoff && (meeting.kickoff.parecer || meeting.kickoff.parecerUtd));
+  const normalizeParecerForExport = (meeting) => normalizeParecer(meeting?.kickoff && (meeting.kickoff.parecer || meeting.kickoff.parecerUtd));
   const html = `<!DOCTYPE html>
   <html lang="pt-BR">
   <head>
@@ -3600,17 +3557,6 @@ function initInkCanvas(container, config) {
 
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
-document.getElementById('btn-header-export-contacts').onclick = () => {
-  const filtered = getDashboardFilteredMeetings().sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-  const people = buildUniquePeopleFromMeetings(filtered);
-  const activeYearLabel = dashboardYearFilter === 'all' ? 'todos os anos' : dashboardYearFilter;
-  exportAllContactsCSV(people, activeYearLabel);
-};
-document.getElementById('btn-header-export-meetings-pdf').onclick = () => {
-  const filtered = getDashboardFilteredMeetings().sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-  const activeYearLabel = dashboardYearFilter === 'all' ? 'todos os anos' : dashboardYearFilter;
-  exportMeetingsListPDF(filtered, activeYearLabel);
-};
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
 
