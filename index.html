@@ -757,10 +757,7 @@ body.dark .rt-editor { background:transparent !important; }
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-export-meetings-pdf" title="Exportar listagem das reuniões em PDF">📄 <span class="btn-label-meetings-pdf">Reuniões PDF</span></button>
-    <button class="btn btn-ghost" id="btn-export-contacts-all" title="Exportar todos os contatos">📊 <span class="btn-label-contacts-all">Contatos</span></button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
-    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -3079,104 +3076,6 @@ function exportContactsCSV(m) {
   showToast(`📊 ${participants.length} contato(s) exportados!`);
 }
 
-function exportAllContactsCSV() {
-  const rows = [];
-  meetings.forEach(m => {
-    (m.participants || []).forEach(p => {
-      rows.push([
-        p.name || '',
-        p.org || '',
-        p.email || '',
-        p.phone || '',
-        m.title || '',
-        fmtDate(m.date || m.createdAt)
-      ]);
-    });
-  });
-  if (!rows.length) {
-    showToast('Nenhum contato para exportar.', 'info');
-    return;
-  }
-  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reunião', 'Data'];
-  const csvContent = [header, ...rows]
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-    .join('\n');
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `contatos_reunioes_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast(`📊 ${rows.length} contato(s) exportados!`);
-}
-
-function getParecerLabel(meeting) {
-  const raw = meeting?.kickoff?.parecer || meeting?.kickoff?.parecerUtd || '';
-  const map = {
-    aderente: 'Aderente ao contrato',
-    parcialmente_aderente: 'Parcialmente Aderente',
-    nao_aderente: 'Não Aderente',
-    'Aderente ao contrato': 'Aderente ao contrato',
-    'Parcialmente Aderente': 'Parcialmente Aderente',
-    'Não Aderente': 'Não Aderente'
-  };
-  return map[raw] || 'Não informado';
-}
-
-function getMeetingCategories(meeting) {
-  const parts = [];
-  const kickoff = meeting.kickoff || {};
-  const canais = Array.isArray(kickoff.canaisPreferidos) ? kickoff.canaisPreferidos : (kickoff.canalPreferido ? [kickoff.canalPreferido] : []);
-  const canalMap = {
-    portal_cidadao: 'Portal Cidadão',
-    tridigitos: 'Tridígitos',
-    app_egdf: 'App eGDF',
-    whatsapp_passivo: 'Whatsapp passivo (chat)',
-    whatsapp_ativo: 'Mensageria Whatsapp ativo'
-  };
-  if (canais.length) parts.push('Canais: ' + canais.map(c => canalMap[c] || c).join(', '));
-  if (Array.isArray(kickoff.servicos) && kickoff.servicos.length) parts.push('Serviços: ' + kickoff.servicos.join(', '));
-  if (Array.isArray(kickoff.insumos) && kickoff.insumos.length) parts.push('Insumos: ' + kickoff.insumos.join(', '));
-  return parts.length ? parts.join(' • ') : 'Não informado';
-}
-
-function exportMeetingsListPDF() {
-  if (!meetings.length) {
-    showToast('Nenhuma reunião para exportar.', 'info');
-    return;
-  }
-  const sorted = [...meetings].sort((a,b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
-  const styles = `
-    body{font-family:Georgia,serif;margin:28px;color:#1e293b;background:#fff}
-    h1{font-size:24px;margin:0 0 6px} .sub{font-size:12px;color:#64748b;margin-bottom:18px}
-    .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
-    .title{font-size:18px;font-weight:700;margin:0 0 6px}.meta{font-size:12px;color:#475569;margin-bottom:10px}
-    .sec{margin-top:10px}.sec h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin:0 0 4px}
-    .txt{font-size:13px;line-height:1.6;white-space:pre-wrap}.pill{display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:999px;padding:2px 8px;font-size:11px;margin-right:6px;margin-bottom:4px}
-    ul{margin:6px 0 0 18px;padding:0} li{font-size:13px;line-height:1.5;margin-bottom:4px}
-  `;
-  const body = sorted.map(m => {
-    const participants = (m.participants || []).map(p => `${p.name || 'Sem nome'}${p.org ? ' — ' + p.org : ''}${p.email ? ' · ' + p.email : ''}${p.phone ? ' · ' + p.phone : ''}`);
-    const actions = (m.actions || []).map(a => `${a.done ? '✓' : '•'} ${a.text || 'Sem descrição'}${a.responsible ? ' — ' + a.responsible : ''}${a.deadline ? ' · Prazo: ' + fmtDate(a.deadline) : ''}`);
-    return `
-      <div class="card">
-        <div class="title">${escHtml(m.title || 'Sem título')}</div>
-        <div class="meta">Data: ${fmtDate(m.date || m.createdAt)} · Status: ${escHtml(m.status || 'Não definido')} · Local: ${escHtml(m.location || 'Não informado')}</div>
-        <div class="sec"><h3>Categorias / Kick-off</h3><div class="txt">${escHtml(getMeetingCategories(m))}</div></div>
-        <div class="sec"><h3>Parecer da UTD / Aderência</h3><div class="txt">${escHtml(getParecerLabel(m))}</div></div>
-        <div class="sec"><h3>Pauta</h3><div class="txt">${escHtml(stripHtml(m.agenda || '') || 'Não informado')}</div></div>
-        <div class="sec"><h3>Participantes</h3>${participants.length ? `<ul>${participants.map(p => `<li>${escHtml(p)}</li>`).join('')}</ul>` : '<div class="txt">Nenhum participante</div>'}</div>
-        <div class="sec"><h3>Encaminhamentos</h3>${actions.length ? `<ul>${actions.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>` : '<div class="txt">Nenhum encaminhamento</div>'}</div>
-      </div>`;
-  }).join('');
-  const win = window.open('', '_blank');
-  if (!win) { showToast('Permita pop-ups para gerar o PDF.', 'info'); return; }
-  win.document.open();
-  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Reuniões PDF</title><style>${styles}</style></head><body><h1>Listagem de reuniões</h1><div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} · ${sorted.length} reunião(ões)</div>${body}<script>window.onload=function(){setTimeout(function(){window.print();},200);}<\/script></body></html>`);
-  win.document.close();
-}
-
 // ===== BUSCA INSTANTÂNEA =====
 let searchFilter = 'todos';
 
@@ -3458,8 +3357,6 @@ function initInkCanvas(container, config) {
 
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
-document.getElementById('btn-export-meetings-pdf').onclick = exportMeetingsListPDF;
-document.getElementById('btn-export-contacts-all').onclick = exportAllContactsCSV;
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
 
