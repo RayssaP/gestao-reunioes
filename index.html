@@ -1122,6 +1122,40 @@ function normalizeMeetingArray(value) {
   return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') : [];
 }
 
+
+function normalizeMeetingForMerge(item) {
+  const src = (item && typeof item === 'object') ? item : {};
+  const normalized = { ...src };
+  normalized.id = String(src.id || genId());
+  normalized.title = typeof src.title === 'string' ? src.title : '';
+  normalized.date = typeof src.date === 'string' ? src.date : '';
+  normalized.location = typeof src.location === 'string' ? src.location : '';
+  normalized.status = typeof src.status === 'string' && src.status ? src.status : 'Agendada';
+  normalized.agenda = typeof src.agenda === 'string' ? src.agenda : '';
+  normalized.notes = typeof src.notes === 'string' ? src.notes : '';
+  normalized.agendaInk = typeof src.agendaInk === 'string' ? src.agendaInk : '';
+  normalized.notesInk = typeof src.notesInk === 'string' ? src.notesInk : '';
+  normalized.createdAt = typeof src.createdAt === 'string' && src.createdAt ? src.createdAt : (src.date || new Date().toISOString());
+  normalized.updatedAt = typeof src.updatedAt === 'string' && src.updatedAt ? src.updatedAt : (src.modifiedAt || src.createdAt || src.date || new Date().toISOString());
+  normalized.modifiedAt = normalized.updatedAt;
+  normalized.participants = Array.isArray(src.participants) ? src.participants.filter(Boolean).map(p => ({
+    name: typeof p?.name === 'string' ? p.name : '',
+    org: typeof p?.org === 'string' ? p.org : '',
+    email: typeof p?.email === 'string' ? p.email : '',
+    phone: typeof p?.phone === 'string' ? p.phone : ''
+  })) : [];
+  normalized.actions = Array.isArray(src.actions) ? src.actions.filter(Boolean).map(a => ({
+    text: typeof a?.text === 'string' ? a.text : '',
+    responsible: typeof a?.responsible === 'string' ? a.responsible : '',
+    deadline: typeof a?.deadline === 'string' ? a.deadline : '',
+    done: !!a?.done
+  })) : [];
+  normalized.documents = Array.isArray(src.documents) ? src.documents.filter(Boolean).map(d => ({ ...d })) : [];
+  normalized.references = Array.isArray(src.references) ? src.references.filter(Boolean).map(String) : [];
+  normalized.kickoff = (src.kickoff && typeof src.kickoff === 'object') ? { ...src.kickoff } : {};
+  return normalized;
+}
+
 function readMeetingsKey(key) {
   try {
     return normalizeMeetingArray(JSON.parse(localStorage.getItem(key) || '[]'));
