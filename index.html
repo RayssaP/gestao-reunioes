@@ -3204,6 +3204,17 @@ function buildUniquePeopleFromMeetings(meetingList) {
   return [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
+function getAllMeetingsForExport() {
+  let fromStorage = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem('reunioes-data') || '[]');
+    if (Array.isArray(parsed)) fromStorage = parsed;
+  } catch {}
+  const fromMemory = Array.isArray(meetings) ? meetings : [];
+  const chosen = fromStorage.length >= fromMemory.length ? fromStorage : fromMemory;
+  return [...chosen].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+}
+
 function exportAllContactsCSV(uniquePeople, activeYearLabel = 'todos_os_anos') {
   if (!uniquePeople || uniquePeople.length === 0) {
     showToast('Nenhum contato para exportar.', 'info');
@@ -3283,7 +3294,7 @@ function exportMeetingsListPDF(meetingList, activeYearLabel = 'todos os anos') {
   </head>
   <body>
     <h1>Lista de reuniões</h1>
-    <div class="sub">Filtro: ${escHtml(activeYearLabel)} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+    <div class="sub">Filtro: ${escHtml(activeYearLabel)} · Total de reuniões: ${meetingList.length} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
     ${meetingList.map(m => `
       <div class="meeting">
         <div class="title">${escHtml(m.title || 'Sem título')}</div>
@@ -3601,12 +3612,14 @@ function initInkCanvas(container, config) {
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
 document.getElementById('btn-header-export-contacts').onclick = () => {
-  const allMeetings = [...meetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  const allMeetings = getAllMeetingsForExport();
   const people = buildUniquePeopleFromMeetings(allMeetings);
+  showToast(`Exportando ${allMeetings.length} reunião(ões) em contatos...`, 'info');
   exportAllContactsCSV(people, 'todos os anos');
 };
 document.getElementById('btn-header-export-meetings-pdf').onclick = () => {
-  const allMeetings = [...meetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  const allMeetings = getAllMeetingsForExport();
+  showToast(`Exportando ${allMeetings.length} reunião(ões) para PDF...`, 'info');
   exportMeetingsListPDF(allMeetings, 'todos os anos');
 };
 
