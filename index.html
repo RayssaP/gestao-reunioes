@@ -1180,6 +1180,237 @@ function mergeMeetingsPreferNewest(primaryList, secondaryList) {
   return [...map.values()].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
 }
 
+
+// ===== GOOGLE DRIVE — GOOGLE IDENTITY SERVICES + DRIVE API =====
+// Requer hospedagem em https:// com Client ID OAuth de Aplicativo da Web.
+// Os dados são salvos em Google Drive/GestaoReunioes/reunioes.json
+const GD_FOLDER = 'GestaoReunioes';
+const GD_FILENAME = 'reunioes.json';
+const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+let odTokenData = null;
+let odUserInfo = null;
+let odPollTimer = null;
+let googleTokenClient = null;
+
+function odSaveTokens(data) {
+  odTokenData = data;
+  localStorage.setItem('gd-tokens', JSON.stringify(data));
+}
+function odLoadTokens() {
+  try { odTokenData = JSON.parse(localStorage.getItem('gd-tokens') || 'null'); } catch { odTokenData = null; }
+}
+function odClearTokens() {
+  odTokenData = null;
+  odUserInfo = null;
+  localStorage.removeItem('gd-tokens');
+  localStorage.removeItem('gd-userinfo');
+  delete settings.gdFolderId;
+  delete settings.gdFileId;
+  saveSettings();
+}
+
+function hasValidGoogleToken() {
+  return !!(odTokenData && odTokenData.access_token && odTokenData.expires_at && Date.now() < odTokenData.expires_at - 60000);
+}
+
+async function ensureGoogleAccess(interactive = false) {
+  if (hasValidGoogleToken()) return odTokenData.access_token;
+  const clientId = settings.odClientId || (document.getElementById('od-client-id-input')?.value || '').trim();
+  if (!clientId) throw new Error('Informe o Client ID OAuth do Google.');
+  if (!window.google?.accounts?.oauth2) throw new Error('Biblioteca do Google não carregou. Abra o sistema já hospedado em HTTPS.');
+  settings.odClientId = clientId;
+  saveSettings();
+  if (!googleTokenClient) {
+    googleTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GD_SCOPES,
+      callback: () => {}
+    });
+  }
+  return await new Promise((resolve, reject) => {
+    const timeout = interactive ? null : setTimeout(() => reject(new Error('TOKEN_TIMEOUT')), 8000);
+    googleTokenClient.callback = async (resp) => {
+      if (timeout) clearTimeout(timeout);
+      if (resp?.error) { reject(new Error(resp.error)); return; }
+      if (!resp?.access_token) { reject(new Error('Google não retornou token de acesso.')); return; }
+      const expiresIn = Number(resp.expires_in || 3600);
+      odSaveTokens({ access_token: resp.access_token, expires_at: Date.now() + expiresIn * 1000 });
+      try { await odFetchUser(); } catch {}
+      updateOdUI();
+      resolve(resp.access_token);
+    };
+    try {
+      googleTokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+    } catch (e) {
+      if (timeout) clearTimeout(timeout);
+      reject(e);
+    }
+  });
+}
+
+async function odAccessToken(interactive = false) {
+  return await ensureGoogleAccess(interactive);
+}
+
+async function gfetch(url, opts = {}) {
+  let token;
+  try {
+    token = await odAccessToken(false);
+  } catch (e) {
+    if (e.message === 'TOKEN_TIMEOUT' || e.message?.includes('token')) {
+      settings.syncPending = true;
+      saveSettings();
+      setOdStatus('err', 'Reconectar');
+      throw new Error('Sessão expirada. Clique em "Drive" e reconecte para sincronizar.');
+    }
+    throw e;
+  }
+  const res = await fetch(url, {
+    ...opts,
+    headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) }
+  });
+  if (res.status === 401 && !opts.__retried) {
+    odClearTokens();
+    settings.syncPending = true;
+    saveSettings();
+    setOdStatus('err', 'Reconectar');
+    updateOdUI();
+    throw new Error('Sessão expirada. Clique em "Drive" e faça login novamente.');
+  }
+  return res;
+}
+
+async function gdFindFolder() {
+  if (settings.gdFolderId) return settings.gdFolderId;
+  const q = encodeURIComponent(`name='${GD_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
+  if (!r.ok) throw new Error('Falha ao localizar pasta no Drive.');
+  const data = await r.json();
+  const id = data.files?.[0]?.id || null;
+  if (id) { settings.gdFolderId = id; saveSettings(); }
+  return id;
+}
+
+async function ensureFolder() {
+  let folderId = await gdFindFolder();
+  if (folderId) return folderId;
+  const r = await gfetch(`${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: GD_FOLDER, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  if (!r.ok) throw new Error('Não foi possível criar a pasta no Drive.');
+  const data = await r.json();
+  settings.gdFolderId = data.id;
+  saveSettings();
+  return data.id;
+}
+
+async function gdFindDataFile(folderId) {
+  if (settings.gdFileId) return settings.gdFileId;
+  const q = encodeURIComponent(`name='${GD_FILENAME}' and '${folderId}' in parents and trashed=false`);
+  const r = await gfetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=10`);
+  if (!r.ok) throw new Error('Falha ao localizar arquivo principal no Drive.');
+  const data = await r.json();
+  const id = data.files?.[0]?.id || null;
+  if (id) { settings.gdFileId = id; saveSettings(); }
+  return id;
+}
+
+async function uploadDriveJson(fileId, folderId, payloadObj) {
+  const metadata = fileId ? { name: GD_FILENAME } : { name: GD_FILENAME, parents: [folderId] };
+  const boundary = '-------314159265358979323846';
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    JSON.stringify(metadata),
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    JSON.stringify(payloadObj, null, 2),
+    `--${boundary}--`
+  ].join('
+');
+  const endpoint = fileId
+    ? `${DRIVE_UPLOAD}/${fileId}?uploadType=multipart&supportsAllDrives=false`
+    : `${DRIVE_UPLOAD}?uploadType=multipart&supportsAllDrives=false`;
+  const method = fileId ? 'PATCH' : 'POST';
+  const r = await gfetch(endpoint, {
+    method,
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`Falha ao salvar no Google Drive (${r.status}). ${txt.slice(0,160)}`);
+  }
+  const data = await r.json();
+  settings.gdFileId = data.id;
+  saveSettings();
+  return data.id;
+}
+
+async function odSaveIndex() {
+  const folderId = await ensureFolder();
+  const fileId = await gdFindDataFile(folderId);
+  await uploadDriveJson(fileId, folderId, {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    meetings
+  });
+}
+
+async function odSaveMeeting(meeting) {
+  if (!meeting) return;
+  setOdStatus('syncing', 'Salvando…');
+  try {
+    const idx = meetings.findIndex(m => m.id === meeting.id);
+    if (idx >= 0) meetings[idx] = meeting;
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch (e) {
+    setOdStatus('err', 'Erro');
+    showToast('Erro Google Drive: ' + e.message, 'info');
+  }
+}
+
+async function odDeleteMeeting() {
+  setOdStatus('syncing', 'Salvando…');
+  try {
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+  } catch (e) {
+    setOdStatus('err', 'Erro ao salvar');
+    showToast('⚠️ Exclusão salva localmente, mas falhou no Drive.', 'info');
+  }
+}
+
+async function odSyncAll() {
+  setOdStatus('syncing', 'Sincronizando…');
+  try {
+    await odSaveIndex();
+    settings.odLastSync = new Date().toISOString();
+    settings.syncPending = false;
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateLastSync();
+    showToast(`☁️ ${meetings.length} reuniões salvas no Google Drive!`);
+  } catch (e) {
+    setOdStatus('err', 'Erro');
+    showToast('Erro: ' + e.message, 'info');
+  }
+}
+
 async function odLoadAll() {
   setOdStatus('syncing', 'Baixando…');
   try {
