@@ -1353,27 +1353,88 @@ async function odSyncAll() {
   }
 }
 
+function getLocalMeetingsSnapshot() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('reunioes-data') || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMeetingForMerge(m) {
+  return {
+    ...m,
+    id: m?.id || genId(),
+    participants: Array.isArray(m?.participants) ? m.participants : [],
+    actions: Array.isArray(m?.actions) ? m.actions : [],
+    documents: Array.isArray(m?.documents) ? m.documents : [],
+    references: Array.isArray(m?.references) ? m.references : []
+  };
+}
+
+function pickNewestMeeting(a, b) {
+  const aTime = new Date(a?.updatedAt || a?.modifiedAt || a?.createdAt || a?.date || 0).getTime() || 0;
+  const bTime = new Date(b?.updatedAt || b?.modifiedAt || b?.createdAt || b?.date || 0).getTime() || 0;
+  return bTime >= aTime ? b : a;
+}
+
+function mergeMeetingsPreferNewest(primaryList, secondaryList) {
+  const map = new Map();
+  [...secondaryList, ...primaryList].forEach(item => {
+    if (!item) return;
+    const meeting = normalizeMeetingForMerge(item);
+    const key = meeting.id;
+    if (!map.has(key)) {
+      map.set(key, meeting);
+    } else {
+      map.set(key, pickNewestMeeting(map.get(key), meeting));
+    }
+  });
+  return [...map.values()].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+}
+
 async function odLoadAll() {
   setOdStatus('syncing', 'Baixando…');
   try {
+    const localMeetings = getLocalMeetingsSnapshot();
     const folderId = await ensureFolder();
     const fileId = await gdFindDataFile(folderId);
     if (!fileId) {
+      meetings = localMeetings;
+      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      renderSidebar();
+      renderDashboard();
       await odSyncAll();
       return;
     }
     const r = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
     if (!r.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
     const data = await r.json();
-    meetings = Array.isArray(data) ? data : (data.meetings || []);
-    localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+    const driveMeetings = Array.isArray(data) ? data : (data.meetings || []);
+
+    const localCount = localMeetings.length;
+    const driveCount = driveMeetings.length;
+
+    if (localCount > driveCount) {
+      meetings = mergeMeetingsPreferNewest(localMeetings, driveMeetings);
+      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      settings.syncPending = false;
+      saveSettings();
+      await odSaveIndex();
+      showToast(`☁️ O Drive tinha ${driveCount} reunião(ões), mas este navegador tinha ${localCount}. Mantive a base mais completa e atualizei o Drive.`, 'info');
+    } else {
+      meetings = mergeMeetingsPreferNewest(driveMeetings, localMeetings);
+      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
+    }
+
     renderSidebar();
     renderDashboard();
     settings.odLastSync = new Date().toISOString();
     saveSettings();
     setOdStatus('on', 'Drive ✓');
     updateLastSync();
-    showToast(`☁️ ${meetings.length} reuniões carregadas do Google Drive!`);
   } catch (e) {
     setOdStatus('err', 'Erro ao baixar');
     showToast('Erro: ' + e.message, 'info');
