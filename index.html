@@ -3826,6 +3826,232 @@ selectMeeting = function(id) {
   if (isMobile()) closeSidebar();
 };
 
+
+
+// ===== DRIVE SYNC OVERRIDES (fonte principal = Drive ao conectar/abrir) =====
+function computeDatasetUpdatedAt(list, fallbackIso = '') {
+  const times = normalizeMeetingArray(list).map(item => new Date(item?.updatedAt || item?.modifiedAt || item?.createdAt || item?.date || 0).getTime() || 0);
+  const maxTime = Math.max(0, ...times);
+  if (maxTime > 0) return new Date(maxTime).toISOString();
+  if (fallbackIso) return fallbackIso;
+  return new Date(0).toISOString();
+}
+
+function getLocalDatasetUpdatedAt(list = null) {
+  const meetingsList = normalizeMeetingArray(list || getLocalMeetingsSnapshot());
+  let fallback = '';
+  try {
+    const meta = JSON.parse(localStorage.getItem('reunioes-data-backup-meta') || 'null');
+    fallback = meta?.savedAt || settings.localDatasetUpdatedAt || '';
+  } catch {
+    fallback = settings.localDatasetUpdatedAt || '';
+  }
+  return computeDatasetUpdatedAt(meetingsList, fallback);
+}
+
+function applyMeetingsToDevice(list, reason = 'sync') {
+  meetings = normalizeMeetingArray(list).map(item => normalizeMeetingForMerge(item));
+  localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+  localStorage.setItem('reunioes-data-autobackup', JSON.stringify(meetings));
+  settings.localDatasetUpdatedAt = computeDatasetUpdatedAt(meetings, new Date().toISOString());
+  saveSettings();
+  backupMeetings(reason);
+  renderSidebar();
+  renderDashboard();
+}
+
+const _originalSaveSettings = saveSettings;
+saveSettings = function() {
+  localStorage.setItem('reunioes-settings', JSON.stringify(settings));
+};
+
+save = function() {
+  meetings = normalizeMeetingArray(meetings).map(item => normalizeMeetingForMerge(item));
+  localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+  localStorage.setItem('reunioes-data-autobackup', JSON.stringify(meetings));
+  settings.localDatasetUpdatedAt = computeDatasetUpdatedAt(meetings, new Date().toISOString());
+  saveSettings();
+  backupMeetings('save');
+};
+
+async function fetchDriveDataset() {
+  const folderId = await ensureFolder();
+  const fileId = await gdFindDataFile(folderId);
+  if (!fileId) {
+    return { exists: false, fileId: null, meetings: [], updatedAt: '', raw: null };
+  }
+  const metaRes = await gfetch(`${DRIVE_API}/files/${fileId}?fields=id,name,modifiedTime`);
+  if (!metaRes.ok) throw new Error('Não foi possível ler os metadados do arquivo do Drive.');
+  const meta = await metaRes.json();
+  const dataRes = await gfetch(`${DRIVE_API}/files/${fileId}?alt=media`);
+  if (!dataRes.ok) throw new Error('Não foi possível baixar as reuniões do Drive.');
+  const raw = await dataRes.json();
+  const driveMeetings = normalizeMeetingArray(Array.isArray(raw) ? raw : (raw?.meetings || []));
+  const payloadUpdatedAt = raw?.updatedAt || raw?.lastSyncAt || meta?.modifiedTime || '';
+  return { exists: true, fileId, meetings: driveMeetings, updatedAt: payloadUpdatedAt, raw };
+}
+
+odSaveIndex = async function() {
+  const folderId = await ensureFolder();
+  const fileId = await gdFindDataFile(folderId);
+  const normalized = normalizeMeetingArray(meetings).map(item => normalizeMeetingForMerge(item));
+  const payloadUpdatedAt = computeDatasetUpdatedAt(normalized, new Date().toISOString());
+  await uploadDriveJson(fileId, folderId, {
+    version: 2,
+    updatedAt: payloadUpdatedAt,
+    lastSyncAt: new Date().toISOString(),
+    device: navigator.userAgent || 'browser',
+    meetings: normalized
+  });
+  settings.odLastSync = new Date().toISOString();
+  settings.localDatasetUpdatedAt = payloadUpdatedAt;
+  settings.syncPending = false;
+  saveSettings();
+  updateLastSync();
+};
+
+odSyncAll = async function() {
+  setOdStatus('syncing', 'Sincronizando…');
+  try {
+    await odSaveIndex();
+    setOdStatus('on', 'Drive ✓');
+    showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
+  } catch (e) {
+    settings.syncPending = true;
+    saveSettings();
+    setOdStatus('err', 'Erro');
+    showToast('Erro: ' + e.message, 'info');
+  }
+};
+
+odSaveMeeting = async function(meeting) {
+  if (!meeting) return;
+  const idx = meetings.findIndex(m => m.id === meeting.id);
+  const nowIso = new Date().toISOString();
+  const normalizedMeeting = normalizeMeetingForMerge({ ...meeting, updatedAt: nowIso });
+  if (idx >= 0) meetings[idx] = normalizedMeeting;
+  else meetings.unshift(normalizedMeeting);
+  save();
+  if (!hasValidGoogleToken() && !settings.odClientId) return;
+  await odSyncAll();
+};
+
+odDeleteMeeting = async function() {
+  save();
+  if (!hasValidGoogleToken() && !settings.odClientId) return;
+  await odSyncAll();
+};
+
+odLoadAll = async function(options = {}) {
+  const { silent = false } = options;
+  if (!silent) setOdStatus('syncing', 'Baixando…');
+  try {
+    const localMeetings = getLocalMeetingsSnapshot();
+    const localUpdatedAt = getLocalDatasetUpdatedAt(localMeetings);
+    const drive = await fetchDriveDataset();
+
+    if (!drive.exists) {
+      applyMeetingsToDevice(localMeetings, 'drive-missing-use-local');
+      if (localMeetings.length > 0) {
+        await odSaveIndex();
+        showToast('☁️ O arquivo do Drive não existia. A base local foi enviada ao Drive.', 'info');
+      }
+      setOdStatus('on', 'Drive ✓');
+      return meetings;
+    }
+
+    const driveUpdatedAt = drive.updatedAt || computeDatasetUpdatedAt(drive.meetings, '');
+    const localHasPending = !!settings.syncPending;
+    const localIsNewer = new Date(localUpdatedAt).getTime() > new Date(driveUpdatedAt || 0).getTime();
+
+    if (localHasPending && localMeetings.length > 0 && localIsNewer) {
+      const merged = mergeMeetingsPreferNewest(localMeetings, drive.meetings);
+      applyMeetingsToDevice(merged, 'drive-merge-local-pending');
+      await odSaveIndex();
+      showToast(`☁️ A base local tinha alterações mais novas. Mesclei ${merged.length} reunião(ões) e atualizei o Drive.`, 'info');
+    } else {
+      const merged = mergeMeetingsPreferNewest(drive.meetings, localMeetings);
+      applyMeetingsToDevice(merged, 'drive-load-primary');
+      settings.syncPending = false;
+      saveSettings();
+      if (!silent) showToast(`☁️ ${merged.length} reuniões carregadas do Google Drive para este aparelho!`);
+    }
+
+    setOdStatus('on', 'Drive ✓');
+    return meetings;
+  } catch (e) {
+    setOdStatus('err', 'Erro ao baixar');
+    if (!silent) showToast('Erro: ' + e.message, 'info');
+    throw e;
+  }
+};
+
+odConnect = async function() {
+  const clientId = (document.getElementById('od-client-id-input')?.value || '').trim();
+  if (!clientId) { showToast('Cole o Client ID OAuth do Google', 'info'); return; }
+  if (location.protocol === 'file:' || location.protocol === 'content:') {
+    showToast('Publique este HTML como site HTTPS antes de usar o login Google.', 'info');
+    return;
+  }
+  settings.odClientId = clientId;
+  saveSettings();
+  const codeBox = document.getElementById('od-device-code-box');
+  const setupArea = document.getElementById('od-disconnected');
+  const statusEl = document.getElementById('od-code-status');
+  const codeEl = document.getElementById('od-code-display');
+  codeBox.style.display = 'block';
+  setupArea.style.display = 'none';
+  codeEl.textContent = 'GOOGLE';
+  statusEl.textContent = 'Abrindo login do Google…';
+  const link = document.getElementById('od-code-url');
+  link.href = 'https://accounts.google.com/';
+  link.textContent = 'accounts.google.com';
+  try {
+    await ensureGoogleAccess(true);
+    codeBox.style.display = 'none';
+    updateOdUI();
+    document.getElementById('modal-settings').classList.add('hidden');
+    await odLoadAll();
+  } catch (e) {
+    codeBox.style.display = 'none';
+    setupArea.style.display = 'block';
+    showToast('Erro: ' + e.message, 'info');
+  }
+};
+
+restoreOdSession = async function() {
+  odLoadTokens();
+  try { if (!odUserInfo) odUserInfo = JSON.parse(localStorage.getItem('gd-userinfo')); } catch {}
+  updateOdUI();
+  const hasToken = !!odTokenData;
+  const hasClientId = !!settings.odClientId;
+  if (!(hasToken || hasClientId)) return;
+  try {
+    await odLoadAll({ silent: true });
+  } catch (e) {
+    try {
+      await ensureGoogleAccess(false);
+      await odLoadAll({ silent: true });
+    } catch {
+      setOdStatus('err', 'Reconectar');
+      showToast('Não foi possível sincronizar automaticamente com o Drive. Os dados locais foram mantidos neste aparelho.', 'info');
+    }
+  }
+};
+
+startAutoSync = function() {
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  if (!settings.autoSync) return;
+  const mins = parseInt(settings.autoSyncInterval || 30);
+  autoSyncTimer = setInterval(async () => {
+    if (hasValidGoogleToken() || settings.odClientId) {
+      try { await odLoadAll({ silent: true }); } catch(e) {}
+    }
+  }, mins * 60 * 1000);
+};
+
+if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
+
 // ===== INIT =====
 restoreLargestLocalDataset();
 renderSidebar();
