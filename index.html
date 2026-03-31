@@ -757,8 +757,8 @@ body.dark .rt-editor { background:transparent !important; }
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-export-meetings" style="gap:6px" title="Exportar reuniões em PDF">📄 <span class="btn-label-export-meetings">Reuniões PDF</span></button>
-    <button class="btn btn-ghost" id="btn-export-contacts" style="gap:6px" title="Exportar todos os contatos">📇 <span class="btn-label-export-contacts">Contatos</span></button>
+    <button class="btn btn-ghost" id="btn-export-meetings-pdf" title="Exportar listagem das reuniões em PDF">📄 <span class="btn-label-meetings-pdf">Reuniões PDF</span></button>
+    <button class="btn btn-ghost" id="btn-export-contacts-all" title="Exportar todos os contatos">📊 <span class="btn-label-contacts-all">Contatos</span></button>
     <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
     <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
@@ -2709,35 +2709,22 @@ function renderDashboard() {
   const canceladas = canceladasList.length;
   const adiadas = adiadasList.length;
 
-  const orgsMap = new Map();
+  const orgsMap = {};
   const peopleMap = new Map();
-  meetings.forEach(m => {
-    const meetingOrgSet = new Set();
-    const meetingPeopleSet = new Set();
-    (m.participants || []).forEach(p => {
-      const org = (p.org || '').trim();
-      if (org) meetingOrgSet.add(org);
-      const key = (p.email || p.name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!peopleMap.has(key)) {
-        peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
-      }
-      const person = peopleMap.get(key);
-      if (org) person.orgs.add(org);
-      if (!meetingPeopleSet.has(key)) {
-        person.count += 1;
-        person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
-        meetingPeopleSet.add(key);
-      }
-    });
-    meetingOrgSet.forEach(org => {
-      if (!orgsMap.has(org)) orgsMap.set(org, new Set());
-      orgsMap.get(org).add(m.id || `${m.title || ''}-${m.date || m.createdAt || ''}`);
-    });
-  });
-  const orgs = [...orgsMap.entries()]
-    .map(([name, meetingIds]) => [name, meetingIds.size])
-    .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0], 'pt-BR'));
+  meetings.forEach(m => (m.participants || []).forEach(p => {
+    const org = (p.org || '').trim();
+    if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
+    const key = (p.email || p.name || '').trim().toLowerCase();
+    if (!key) return;
+    if (!peopleMap.has(key)) {
+      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
+    }
+    const person = peopleMap.get(key);
+    if (org) person.orgs.add(org);
+    person.count += 1;
+    person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
+  }));
+  const orgs = Object.entries(orgsMap).sort((a,b) => b[1]-a[1]);
   const uniquePeople = [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const allActions = [];
@@ -2792,19 +2779,9 @@ function renderDashboard() {
     'Não Aderente': 0,
     'Não informado': 0
   };
-  const parecerValueToLabel = {
-    aderente: 'Aderente ao contrato',
-    parcialmente_aderente: 'Parcialmente Aderente',
-    nao_aderente: 'Não Aderente',
-    'Aderente ao contrato': 'Aderente ao contrato',
-    'Parcialmente Aderente': 'Parcialmente Aderente',
-    'Não Aderente': 'Não Aderente'
-  };
   meetings.forEach(m => {
-    const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
-    const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
-    const parecerLabel = parecerValueToLabel[normalizedParecer] || '';
-    if (parecerLabel && Object.prototype.hasOwnProperty.call(parecerMap, parecerLabel)) parecerMap[parecerLabel] += 1;
+    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
+    if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
     else parecerMap['Não informado'] += 1;
   });
   const parecerEntries = Object.entries(parecerMap);
@@ -2911,10 +2888,10 @@ function renderDashboard() {
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
           })()}
           <div class="donut-legend">
-            <div class="donut-legend-item clickable-filter" tabindex="0" role="button" data-status-filter="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
-            <div class="donut-legend-item clickable-filter" tabindex="0" role="button" data-status-filter="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
-            <div class="donut-legend-item clickable-filter" tabindex="0" role="button" data-status-filter="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
-            <div class="donut-legend-item clickable-filter" tabindex="0" role="button" data-status-filter="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
           </div>
         </div>`}
       </div>
@@ -2927,7 +2904,7 @@ function renderDashboard() {
             <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
             <div class="year-bars">
               ${yearEntries.map(([year,count]) => `
-                <div class="year-col clickable-filter" tabindex="0" role="button" data-year-filter="${year}">
+                <div class="year-col">
                   <div class="year-count">${count}</div>
                   <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
                   <div class="year-label">${year}</div>
@@ -2937,8 +2914,8 @@ function renderDashboard() {
           <div>
             <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
             <div class="year-bars">
-              ${monthEntries.map(([key,meta]) => `
-                <div class="year-col clickable-filter" tabindex="0" role="button" data-month-filter="${key}" data-month-label="${meta.label}">
+              ${monthEntries.map(([,meta]) => `
+                <div class="year-col">
                   <div class="year-count">${meta.count}</div>
                   <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
                   <div class="year-label">${meta.label}</div>
@@ -2957,7 +2934,7 @@ function renderDashboard() {
           orgs.slice(0, 7).map(([name, count]) => `
             <div class="org-item">
               <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
-              <span class="org-pill">${count} ${count > 1 ? 'reuniões' : 'reunião'}</span>
+              <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
             </div>`).join('')}
       </div>
     </div>
@@ -2966,7 +2943,7 @@ function renderDashboard() {
       <div class="dash-card-body">
         ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
           ${parecerEntries.map(([label,count]) => `
-            <div class="parecer-row clickable-filter" tabindex="0" role="button" data-parecer-filter="${escHtml(label)}">
+            <div class="parecer-row">
               <div class="parecer-name">${escHtml(label)}</div>
               <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
               <div class="parecer-value">${count}</div>
@@ -2995,87 +2972,6 @@ function renderDashboard() {
       } else if (key === 'overdue') {
         openDashboardListModal('Encaminhamentos vencidos', renderActionsList(vencidosList));
       }
-    });
-  });
-
-  const bindKeyboardClick = node => {
-    node.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        node.click();
-      }
-    });
-  };
-
-  el.querySelectorAll('[data-status-filter]').forEach(node => {
-    bindKeyboardClick(node);
-    node.addEventListener('click', () => {
-      const status = node.dataset.statusFilter;
-      const filtered = meetingsSorted.filter(m => (m.status || '') === status);
-      openDashboardListModal(`Reuniões com status: ${status}`, renderMeetingList(filtered));
-    });
-  });
-
-  el.querySelectorAll('[data-year-filter]').forEach(node => {
-    bindKeyboardClick(node);
-    node.addEventListener('click', () => {
-      const year = node.dataset.yearFilter;
-      const filtered = meetingsSorted.filter(m => {
-        const raw = m.date || m.createdAt;
-        if (!raw) return false;
-        const d = new Date(raw);
-        return !isNaN(d) && String(d.getFullYear()) === year;
-      });
-      openDashboardListModal(`Reuniões em ${year}`, renderMeetingList(filtered));
-    });
-  });
-
-  el.querySelectorAll('[data-month-filter]').forEach(node => {
-    bindKeyboardClick(node);
-    node.addEventListener('click', () => {
-      const key = node.dataset.monthFilter;
-      const label = node.dataset.monthLabel || key;
-      const filtered = meetingsSorted.filter(m => {
-        const raw = m.date || m.createdAt;
-        if (!raw) return false;
-        const d = new Date(raw);
-        if (isNaN(d)) return false;
-        const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        return monthKey === key;
-      });
-      openDashboardListModal(`Reuniões em ${label}`, renderMeetingList(filtered));
-    });
-  });
-
-  const parecerMeetingMap = {
-    'Aderente ao contrato': meetingsSorted.filter(m => {
-      const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
-      const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
-      return (parecerValueToLabel[normalizedParecer] || '') === 'Aderente ao contrato';
-    }),
-    'Parcialmente Aderente': meetingsSorted.filter(m => {
-      const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
-      const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
-      return (parecerValueToLabel[normalizedParecer] || '') === 'Parcialmente Aderente';
-    }),
-    'Não Aderente': meetingsSorted.filter(m => {
-      const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
-      const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
-      return (parecerValueToLabel[normalizedParecer] || '') === 'Não Aderente';
-    }),
-    'Não informado': meetingsSorted.filter(m => {
-      const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
-      const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
-      return !(parecerValueToLabel[normalizedParecer] || '');
-    })
-  };
-
-  el.querySelectorAll('[data-parecer-filter]').forEach(node => {
-    bindKeyboardClick(node);
-    node.addEventListener('click', () => {
-      const label = node.dataset.parecerFilter;
-      const filtered = parecerMeetingMap[label] || [];
-      openDashboardListModal(`Reuniões com parecer: ${label}`, renderMeetingList(filtered));
     });
   });
 }
@@ -3183,182 +3079,102 @@ function exportContactsCSV(m) {
   showToast(`📊 ${participants.length} contato(s) exportados!`);
 }
 
-
-function downloadBlob(blob, filename) {
+function exportAllContactsCSV() {
+  const rows = [];
+  meetings.forEach(m => {
+    (m.participants || []).forEach(p => {
+      rows.push([
+        p.name || '',
+        p.org || '',
+        p.email || '',
+        p.phone || '',
+        m.title || '',
+        fmtDate(m.date || m.createdAt)
+      ]);
+    });
+  });
+  if (!rows.length) {
+    showToast('Nenhum contato para exportar.', 'info');
+    return;
+  }
+  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reunião', 'Data'];
+  const csvContent = [header, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = `contatos_reunioes_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+  URL.revokeObjectURL(url);
+  showToast(`📊 ${rows.length} contato(s) exportados!`);
 }
 
-function normalizeParecerValue(raw) {
-  const v = String(raw || '').trim().toLowerCase();
-  if (!v) return 'nao_informado';
-  if (v === 'aderente' || v.includes('aderente ao contrato')) return 'aderente';
-  if (v === 'parcialmente_aderente' || v.includes('parcialmente aderente')) return 'parcialmente_aderente';
-  if (v === 'nao_aderente' || v === 'não_aderente' || v.includes('não aderente') || v.includes('nao aderente')) return 'nao_aderente';
-  return 'nao_informado';
-}
-
-function parecerLabel(raw) {
-  const key = normalizeParecerValue(raw);
-  return {
+function getParecerLabel(meeting) {
+  const raw = meeting?.kickoff?.parecer || meeting?.kickoff?.parecerUtd || '';
+  const map = {
     aderente: 'Aderente ao contrato',
     parcialmente_aderente: 'Parcialmente Aderente',
     nao_aderente: 'Não Aderente',
-    nao_informado: 'Não informado'
-  }[key] || 'Não informado';
+    'Aderente ao contrato': 'Aderente ao contrato',
+    'Parcialmente Aderente': 'Parcialmente Aderente',
+    'Não Aderente': 'Não Aderente'
+  };
+  return map[raw] || 'Não informado';
 }
 
-function kickoffCanaisLabels(canais) {
-  return (Array.isArray(canais) ? canais : [])
-    .map(v => (KICKOFF_CANAIS.find(c => c.value === v)?.label || v))
-    .filter(Boolean);
+function getMeetingCategories(meeting) {
+  const parts = [];
+  const kickoff = meeting.kickoff || {};
+  const canais = Array.isArray(kickoff.canaisPreferidos) ? kickoff.canaisPreferidos : (kickoff.canalPreferido ? [kickoff.canalPreferido] : []);
+  const canalMap = {
+    portal_cidadao: 'Portal Cidadão',
+    tridigitos: 'Tridígitos',
+    app_egdf: 'App eGDF',
+    whatsapp_passivo: 'Whatsapp passivo (chat)',
+    whatsapp_ativo: 'Mensageria Whatsapp ativo'
+  };
+  if (canais.length) parts.push('Canais: ' + canais.map(c => canalMap[c] || c).join(', '));
+  if (Array.isArray(kickoff.servicos) && kickoff.servicos.length) parts.push('Serviços: ' + kickoff.servicos.join(', '));
+  if (Array.isArray(kickoff.insumos) && kickoff.insumos.length) parts.push('Insumos: ' + kickoff.insumos.join(', '));
+  return parts.length ? parts.join(' • ') : 'Não informado';
 }
 
-function exportAllMeetingsData() {
+function exportMeetingsListPDF() {
   if (!meetings.length) {
     showToast('Nenhuma reunião para exportar.', 'info');
     return;
   }
-
-  const css = `
-    body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;margin:28px;line-height:1.45}
-    h1{font-size:22px;margin:0 0 6px;color:#0f172a}
-    .sub{color:#475569;font-size:12px;margin-bottom:20px}
-    .meeting{border:1px solid #cbd5e1;border-radius:12px;padding:16px 18px;margin:0 0 18px;page-break-inside:avoid}
-    .meeting h2{font-size:18px;margin:0 0 10px;color:#0f172a}
-    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;margin-bottom:12px;font-size:12px}
-    .section{margin-top:12px}
-    .section h3{font-size:13px;margin:0 0 6px;color:#334155;text-transform:uppercase;letter-spacing:.04em}
-    .box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:12px}
-    ul{margin:6px 0 0 18px;padding:0}
-    li{margin:4px 0}
-    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
-    th,td{border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;text-align:left}
-    th{background:#f1f5f9}
-    .muted{color:#64748b}
-    @media print{body{margin:16px}.meeting{break-inside:avoid}}
+  const sorted = [...meetings].sort((a,b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+  const styles = `
+    body{font-family:Georgia,serif;margin:28px;color:#1e293b;background:#fff}
+    h1{font-size:24px;margin:0 0 6px} .sub{font-size:12px;color:#64748b;margin-bottom:18px}
+    .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
+    .title{font-size:18px;font-weight:700;margin:0 0 6px}.meta{font-size:12px;color:#475569;margin-bottom:10px}
+    .sec{margin-top:10px}.sec h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin:0 0 4px}
+    .txt{font-size:13px;line-height:1.6;white-space:pre-wrap}.pill{display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:999px;padding:2px 8px;font-size:11px;margin-right:6px;margin-bottom:4px}
+    ul{margin:6px 0 0 18px;padding:0} li{font-size:13px;line-height:1.5;margin-bottom:4px}
   `;
-
-  const meetingsSorted = [...meetings].sort((a,b)=> new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
-  const htmlMeetings = meetingsSorted.map((m, idx) => {
-    const kickoff = m.kickoff || {};
-    const participantes = (m.participants || []).length
-      ? `<table><thead><tr><th>Nome</th><th>Órgão/Instituição</th><th>E-mail</th><th>Telefone</th></tr></thead><tbody>${(m.participants || []).map(p => `<tr><td>${escHtml(p.name || '')}</td><td>${escHtml(p.org || '')}</td><td>${escHtml(p.email || '')}</td><td>${escHtml(p.phone || '')}</td></tr>`).join('')}</tbody></table>`
-      : '<div class="muted">Nenhum participante informado.</div>';
-    const encaminhamentos = (m.actions || []).length
-      ? `<table><thead><tr><th>Descrição</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>${(m.actions || []).map(a => `<tr><td>${escHtml(a.text || '')}</td><td>${escHtml(a.responsible || '')}</td><td>${escHtml(fmtDate(a.dueDate || a.deadline || ''))}</td><td>${a.done ? 'Concluído' : 'Pendente'}</td></tr>`).join('')}</tbody></table>`
-      : '<div class="muted">Nenhum encaminhamento informado.</div>';
-    const kickoffItems = [
-      ['Problema', kickoff.problema],
-      ['Objetivo', kickoff.objetivo],
-      ['Público-alvo', kickoff.publicoAlvo],
-      ['Processo atual', kickoff.processoAtual],
-      ['Processo definido', kickoff.processoDefinido],
-      ['Base com informações', kickoff.baseInformacoes],
-      ['Migração de dados', kickoff.migracaoDados],
-      ['Jornada do usuário', kickoff.jornadaUsuario],
-      ['Dependências', kickoff.dependencias],
-      ['Estimativa de volume', kickoff.estimativaVolume],
-      ['Canais preferidos', kickoffCanaisLabels(kickoff.canaisPreferidos)],
-      ['Possui base de conhecimento', kickoff.possuiBaseConhecimento],
-      ['Prazo externo', kickoff.prazoExterno],
-      ['Parecer da UTD', parecerLabel(kickoff.parecer || m.parecer || m.parecerUtd)]
-    ].filter(([,v]) => Array.isArray(v) ? v.length : String(v || '').trim());
-    const kickoffHtml = kickoffItems.length || (Array.isArray(kickoff.insumos) && kickoff.insumos.length) || (Array.isArray(kickoff.servicos) && kickoff.servicos.length)
-      ? `
-        <div class="box">
-          ${kickoffItems.length ? `<ul>${kickoffItems.map(([k,v]) => `<li><strong>${escHtml(k)}:</strong> ${escHtml(Array.isArray(v) ? v.join(', ') : String(v || ''))}</li>`).join('')}</ul>` : ''}
-          ${Array.isArray(kickoff.insumos) && kickoff.insumos.length ? `<div class="section"><h3>Insumos identificados</h3><ul>${kickoff.insumos.map(v => `<li>${escHtml(v)}</li>`).join('')}</ul></div>` : ''}
-          ${Array.isArray(kickoff.servicos) && kickoff.servicos.length ? `<div class="section"><h3>Serviços previstos</h3><ul>${kickoff.servicos.map(v => `<li>${escHtml(v)}</li>`).join('')}</ul></div>` : ''}
-        </div>`
-      : '<div class="muted">Sem informações de kick-off.</div>';
-
+  const body = sorted.map(m => {
+    const participants = (m.participants || []).map(p => `${p.name || 'Sem nome'}${p.org ? ' — ' + p.org : ''}${p.email ? ' · ' + p.email : ''}${p.phone ? ' · ' + p.phone : ''}`);
+    const actions = (m.actions || []).map(a => `${a.done ? '✓' : '•'} ${a.text || 'Sem descrição'}${a.responsible ? ' — ' + a.responsible : ''}${a.deadline ? ' · Prazo: ' + fmtDate(a.deadline) : ''}`);
     return `
-      <section class="meeting">
-        <h2>${idx + 1}. ${escHtml(m.title || 'Sem título')}</h2>
-        <div class="meta">
-          <div><strong>Status:</strong> ${escHtml(m.status || 'Não informado')}</div>
-          <div><strong>Data:</strong> ${escHtml(fmtDate(m.date || m.createdAt || ''))}</div>
-          <div><strong>Hora:</strong> ${escHtml(m.time || 'Não informada')}</div>
-          <div><strong>Local:</strong> ${escHtml(m.location || 'Não informado')}</div>
-          <div><strong>Parecer da UTD:</strong> ${escHtml(parecerLabel(kickoff.parecer || m.parecer || m.parecerUtd) || 'Não informado')}</div>
-          <div><strong>Total de participantes:</strong> ${(m.participants || []).length}</div>
-        </div>
-        <div class="section"><h3>Pauta / Objetivos</h3><div class="box">${m.agenda || '<span class="muted">Não informado.</span>'}</div></div>
-        <div class="section"><h3>Anotações / Discussões</h3><div class="box">${m.notes || '<span class="muted">Não informado.</span>'}</div></div>
-        <div class="section"><h3>Participantes</h3>${participantes}</div>
-        <div class="section"><h3>Encaminhamentos</h3>${encaminhamentos}</div>
-        <div class="section"><h3>Kick-off / Categorização</h3>${kickoffHtml}</div>
-      </section>`;
+      <div class="card">
+        <div class="title">${escHtml(m.title || 'Sem título')}</div>
+        <div class="meta">Data: ${fmtDate(m.date || m.createdAt)} · Status: ${escHtml(m.status || 'Não definido')} · Local: ${escHtml(m.location || 'Não informado')}</div>
+        <div class="sec"><h3>Categorias / Kick-off</h3><div class="txt">${escHtml(getMeetingCategories(m))}</div></div>
+        <div class="sec"><h3>Parecer da UTD / Aderência</h3><div class="txt">${escHtml(getParecerLabel(m))}</div></div>
+        <div class="sec"><h3>Pauta</h3><div class="txt">${escHtml(stripHtml(m.agenda || '') || 'Não informado')}</div></div>
+        <div class="sec"><h3>Participantes</h3>${participants.length ? `<ul>${participants.map(p => `<li>${escHtml(p)}</li>`).join('')}</ul>` : '<div class="txt">Nenhum participante</div>'}</div>
+        <div class="sec"><h3>Encaminhamentos</h3>${actions.length ? `<ul>${actions.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>` : '<div class="txt">Nenhum encaminhamento</div>'}</div>
+      </div>`;
   }).join('');
-
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Reuniões categorizadas</title><style>${css}</style></head><body><h1>Relatório de reuniões</h1><div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} · ${meetings.length} reunião(ões)</div>${htmlMeetings}</body></html>`;
-
-  const w = window.open('', '_blank');
-  if (!w) {
-    showToast('O navegador bloqueou a abertura do PDF. Permita pop-ups para este arquivo.', 'info');
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => {
-    try { w.print(); } catch (e) {}
-  }, 350);
-  showToast('📄 Relatório aberto para salvar em PDF.');
-}
-
-function exportAllContactsData() {
-  const allContacts = [];
-  const seen = new Set();
-
-  meetings.forEach(m => {
-    (m.participants || []).forEach(p => {
-      const key = [p.name || '', p.org || '', p.email || '', p.phone || ''].join('|').toLowerCase();
-      const meetingLabel = m.title || 'Sem título';
-      if (!seen.has(key)) {
-        seen.add(key);
-        allContacts.push({
-          nome: p.name || '',
-          orgao_instituicao: p.org || '',
-          email: p.email || '',
-          telefone: p.phone || '',
-          reunioes: [meetingLabel],
-          datas_reunioes: [fmtDate(m.date)]
-        });
-      } else {
-        const existing = allContacts.find(c => [c.nome, c.orgao_instituicao, c.email, c.telefone].join('|').toLowerCase() === key);
-        if (existing) {
-          if (!existing.reunioes.includes(meetingLabel)) existing.reunioes.push(meetingLabel);
-          const d = fmtDate(m.date);
-          if (!existing.datas_reunioes.includes(d)) existing.datas_reunioes.push(d);
-        }
-      }
-    });
-  });
-
-  if (!allContacts.length) {
-    showToast('Nenhum contato para exportar.', 'info');
-    return;
-  }
-
-  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reuniões relacionadas', 'Datas das reuniões'];
-  const rows = allContacts.map(c => [
-    c.nome,
-    c.orgao_instituicao,
-    c.email,
-    c.telefone,
-    c.reunioes.join(' | '),
-    c.datas_reunioes.join(' | ')
-  ]);
-  const csv = [header, ...rows].map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';')).join('\n');
-  downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }), `contatos_gerais_${new Date().toISOString().slice(0,10)}.csv`);
-  showToast(`📇 ${allContacts.length} contato(s) exportados!`);
+  const win = window.open('', '_blank');
+  if (!win) { showToast('Permita pop-ups para gerar o PDF.', 'info'); return; }
+  win.document.open();
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Reuniões PDF</title><style>${styles}</style></head><body><h1>Listagem de reuniões</h1><div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} · ${sorted.length} reunião(ões)</div>${body}<script>window.onload=function(){setTimeout(function(){window.print();},200);}<\/script></body></html>`);
+  win.document.close();
 }
 
 // ===== BUSCA INSTANTÂNEA =====
@@ -3642,8 +3458,8 @@ function initInkCanvas(container, config) {
 
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
-document.getElementById('btn-export-meetings').onclick = exportAllMeetingsData;
-document.getElementById('btn-export-contacts').onclick = exportAllContactsData;
+document.getElementById('btn-export-meetings-pdf').onclick = exportMeetingsListPDF;
+document.getElementById('btn-export-contacts-all').onclick = exportAllContactsCSV;
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
 
