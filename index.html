@@ -3601,15 +3601,13 @@ function initInkCanvas(container, config) {
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
 document.getElementById('btn-header-export-contacts').onclick = () => {
-  const filtered = getDashboardFilteredMeetings().sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-  const people = buildUniquePeopleFromMeetings(filtered);
-  const activeYearLabel = dashboardYearFilter === 'all' ? 'todos os anos' : dashboardYearFilter;
-  exportAllContactsCSV(people, activeYearLabel);
+  const allMeetings = [...meetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  const people = buildUniquePeopleFromMeetings(allMeetings);
+  exportAllContactsCSV(people, 'todos os anos');
 };
 document.getElementById('btn-header-export-meetings-pdf').onclick = () => {
-  const filtered = getDashboardFilteredMeetings().sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-  const activeYearLabel = dashboardYearFilter === 'all' ? 'todos os anos' : dashboardYearFilter;
-  exportMeetingsListPDF(filtered, activeYearLabel);
+  const allMeetings = [...meetings].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  exportMeetingsListPDF(allMeetings, 'todos os anos');
 };
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
