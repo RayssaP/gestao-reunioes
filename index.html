@@ -2709,22 +2709,35 @@ function renderDashboard() {
   const canceladas = canceladasList.length;
   const adiadas = adiadasList.length;
 
-  const orgsMap = {};
+  const orgsMap = new Map();
   const peopleMap = new Map();
-  meetings.forEach(m => (m.participants || []).forEach(p => {
-    const org = (p.org || '').trim();
-    if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
-    const key = (p.email || p.name || '').trim().toLowerCase();
-    if (!key) return;
-    if (!peopleMap.has(key)) {
-      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
-    }
-    const person = peopleMap.get(key);
-    if (org) person.orgs.add(org);
-    person.count += 1;
-    person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
-  }));
-  const orgs = Object.entries(orgsMap).sort((a,b) => b[1]-a[1]);
+  meetings.forEach(m => {
+    const meetingOrgSet = new Set();
+    const meetingPeopleSet = new Set();
+    (m.participants || []).forEach(p => {
+      const org = (p.org || '').trim();
+      if (org) meetingOrgSet.add(org);
+      const key = (p.email || p.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!peopleMap.has(key)) {
+        peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
+      }
+      const person = peopleMap.get(key);
+      if (org) person.orgs.add(org);
+      if (!meetingPeopleSet.has(key)) {
+        person.count += 1;
+        person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
+        meetingPeopleSet.add(key);
+      }
+    });
+    meetingOrgSet.forEach(org => {
+      if (!orgsMap.has(org)) orgsMap.set(org, new Set());
+      orgsMap.get(org).add(m.id || `${m.title || ''}-${m.date || m.createdAt || ''}`);
+    });
+  });
+  const orgs = [...orgsMap.entries()]
+    .map(([name, meetingIds]) => [name, meetingIds.size])
+    .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0], 'pt-BR'));
   const uniquePeople = [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const allActions = [];
@@ -2779,9 +2792,19 @@ function renderDashboard() {
     'Não Aderente': 0,
     'Não informado': 0
   };
+  const parecerValueToLabel = {
+    aderente: 'Aderente ao contrato',
+    parcialmente_aderente: 'Parcialmente Aderente',
+    nao_aderente: 'Não Aderente',
+    'Aderente ao contrato': 'Aderente ao contrato',
+    'Parcialmente Aderente': 'Parcialmente Aderente',
+    'Não Aderente': 'Não Aderente'
+  };
   meetings.forEach(m => {
-    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
-    if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
+    const rawParecer = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) || m.parecer || m.parecerUtd || '';
+    const normalizedParecer = typeof rawParecer === 'string' ? rawParecer.trim() : '';
+    const parecerLabel = parecerValueToLabel[normalizedParecer] || '';
+    if (parecerLabel && Object.prototype.hasOwnProperty.call(parecerMap, parecerLabel)) parecerMap[parecerLabel] += 1;
     else parecerMap['Não informado'] += 1;
   });
   const parecerEntries = Object.entries(parecerMap);
@@ -2934,7 +2957,7 @@ function renderDashboard() {
           orgs.slice(0, 7).map(([name, count]) => `
             <div class="org-item">
               <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
-              <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
+              <span class="org-pill">${count} ${count > 1 ? 'reuniões' : 'reunião'}</span>
             </div>`).join('')}
       </div>
     </div>
