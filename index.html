@@ -757,7 +757,7 @@ body.dark .rt-editor { background:transparent !important; }
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-export-meetings" style="gap:6px" title="Exportar todas as reuniões">⬇️ <span class="btn-label-export-meetings">Reuniões</span></button>
+    <button class="btn btn-ghost" id="btn-export-meetings" style="gap:6px" title="Exportar reuniões em PDF">📄 <span class="btn-label-export-meetings">Reuniões PDF</span></button>
     <button class="btn btn-ghost" id="btn-export-contacts" style="gap:6px" title="Exportar todos os contatos">📇 <span class="btn-label-export-contacts">Contatos</span></button>
     <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
     <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
@@ -2937,7 +2937,7 @@ function renderDashboard() {
           <div>
             <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
             <div class="year-bars">
-              ${monthEntries.map(([,meta]) => `
+              ${monthEntries.map(([key,meta]) => `
                 <div class="year-col clickable-filter" tabindex="0" role="button" data-month-filter="${key}" data-month-label="${meta.label}">
                   <div class="year-count">${meta.count}</div>
                   <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
@@ -3224,75 +3224,93 @@ function exportAllMeetingsData() {
     return;
   }
 
-  const payload = {
-    exportadoEm: new Date().toISOString(),
-    totais: {
-      reunioes: meetings.length,
-      contatos: meetings.reduce((acc, m) => acc + ((m.participants || []).length), 0),
-      encaminhamentos: meetings.reduce((acc, m) => acc + ((m.actions || []).length), 0),
-      documentos: meetings.reduce((acc, m) => acc + ((m.documents || []).length), 0)
-    },
-    reunioes: meetings.map(m => ({
-      categoria_reuniao: {
-        id: m.id || '',
-        titulo: m.title || '',
-        status: m.status || '',
-        data: m.date || '',
-        hora: m.time || '',
-        local: m.location || '',
-        data_formatada: fmtDate(m.date),
-        criado_em: m.createdAt || '',
-        atualizado_em: m.updatedAt || ''
-      },
-      categoria_conteudo: {
-        pauta_objetivos_html: m.agenda || '',
-        anotacoes_discussoes_html: m.notes || '',
-        pauta_tem_escrita_manual: !!m.agendaInk,
-        anotacoes_tem_escrita_manual: !!m.notesInk
-      },
-      categoria_participantes: (m.participants || []).map(p => ({
-        nome: p.name || '',
-        orgao_instituicao: p.org || '',
-        email: p.email || '',
-        telefone: p.phone || ''
-      })),
-      categoria_encaminhamentos: (m.actions || []).map(a => ({
-        descricao: a.text || '',
-        responsavel: a.responsible || '',
-        prazo: a.dueDate || '',
-        prazo_formatado: fmtDate(a.dueDate),
-        concluido: !!a.done
-      })),
-      categoria_documentos: (m.documents || []).map(d => ({
-        nome: d.name || '',
-        url: d.url || '',
-        tipo: d.type || '',
-        observacao: d.notes || ''
-      })),
-      categoria_kickoff: {
-        problema: m.kickoff?.problema || '',
-        objetivo: m.kickoff?.objetivo || '',
-        publico_alvo: m.kickoff?.publicoAlvo || '',
-        processo_atual: m.kickoff?.processoAtual || '',
-        processo_definido: m.kickoff?.processoDefinido || '',
-        base_informacoes: m.kickoff?.baseInformacoes || '',
-        migracao_dados: m.kickoff?.migracaoDados || '',
-        jornada_usuario: m.kickoff?.jornadaUsuario || '',
-        dependencias: m.kickoff?.dependencias || '',
-        estimativa_volume: m.kickoff?.estimativaVolume || '',
-        canais_preferidos: kickoffCanaisLabels(m.kickoff?.canaisPreferidos),
-        possui_base_conhecimento: m.kickoff?.possuiBaseConhecimento || '',
-        prazo_externo: m.kickoff?.prazoExterno || '',
-        insumos_identificados: Array.isArray(m.kickoff?.insumos) ? m.kickoff.insumos : [],
-        servicos_previstos: Array.isArray(m.kickoff?.servicos) ? m.kickoff.servicos : [],
-        parecer_utd: parecerLabel(m.kickoff?.parecer || m.parecer || m.parecerUtd)
-      }
-    }))
-  };
+  const css = `
+    body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;margin:28px;line-height:1.45}
+    h1{font-size:22px;margin:0 0 6px;color:#0f172a}
+    .sub{color:#475569;font-size:12px;margin-bottom:20px}
+    .meeting{border:1px solid #cbd5e1;border-radius:12px;padding:16px 18px;margin:0 0 18px;page-break-inside:avoid}
+    .meeting h2{font-size:18px;margin:0 0 10px;color:#0f172a}
+    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;margin-bottom:12px;font-size:12px}
+    .section{margin-top:12px}
+    .section h3{font-size:13px;margin:0 0 6px;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+    .box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:12px}
+    ul{margin:6px 0 0 18px;padding:0}
+    li{margin:4px 0}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+    th,td{border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;text-align:left}
+    th{background:#f1f5f9}
+    .muted{color:#64748b}
+    @media print{body{margin:16px}.meeting{break-inside:avoid}}
+  `;
 
-  const json = JSON.stringify(payload, null, 2);
-  downloadBlob(new Blob([json], { type: 'application/json;charset=utf-8' }), `reunioes_categorizadas_${new Date().toISOString().slice(0,10)}.json`);
-  showToast(`⬇️ ${meetings.length} reunião(ões) exportadas em JSON!`);
+  const meetingsSorted = [...meetings].sort((a,b)=> new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+  const htmlMeetings = meetingsSorted.map((m, idx) => {
+    const kickoff = m.kickoff || {};
+    const participantes = (m.participants || []).length
+      ? `<table><thead><tr><th>Nome</th><th>Órgão/Instituição</th><th>E-mail</th><th>Telefone</th></tr></thead><tbody>${(m.participants || []).map(p => `<tr><td>${escHtml(p.name || '')}</td><td>${escHtml(p.org || '')}</td><td>${escHtml(p.email || '')}</td><td>${escHtml(p.phone || '')}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted">Nenhum participante informado.</div>';
+    const encaminhamentos = (m.actions || []).length
+      ? `<table><thead><tr><th>Descrição</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>${(m.actions || []).map(a => `<tr><td>${escHtml(a.text || '')}</td><td>${escHtml(a.responsible || '')}</td><td>${escHtml(fmtDate(a.dueDate || a.deadline || ''))}</td><td>${a.done ? 'Concluído' : 'Pendente'}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted">Nenhum encaminhamento informado.</div>';
+    const kickoffItems = [
+      ['Problema', kickoff.problema],
+      ['Objetivo', kickoff.objetivo],
+      ['Público-alvo', kickoff.publicoAlvo],
+      ['Processo atual', kickoff.processoAtual],
+      ['Processo definido', kickoff.processoDefinido],
+      ['Base com informações', kickoff.baseInformacoes],
+      ['Migração de dados', kickoff.migracaoDados],
+      ['Jornada do usuário', kickoff.jornadaUsuario],
+      ['Dependências', kickoff.dependencias],
+      ['Estimativa de volume', kickoff.estimativaVolume],
+      ['Canais preferidos', kickoffCanaisLabels(kickoff.canaisPreferidos)],
+      ['Possui base de conhecimento', kickoff.possuiBaseConhecimento],
+      ['Prazo externo', kickoff.prazoExterno],
+      ['Parecer da UTD', parecerLabel(kickoff.parecer || m.parecer || m.parecerUtd)]
+    ].filter(([,v]) => Array.isArray(v) ? v.length : String(v || '').trim());
+    const kickoffHtml = kickoffItems.length || (Array.isArray(kickoff.insumos) && kickoff.insumos.length) || (Array.isArray(kickoff.servicos) && kickoff.servicos.length)
+      ? `
+        <div class="box">
+          ${kickoffItems.length ? `<ul>${kickoffItems.map(([k,v]) => `<li><strong>${escHtml(k)}:</strong> ${escHtml(Array.isArray(v) ? v.join(', ') : String(v || ''))}</li>`).join('')}</ul>` : ''}
+          ${Array.isArray(kickoff.insumos) && kickoff.insumos.length ? `<div class="section"><h3>Insumos identificados</h3><ul>${kickoff.insumos.map(v => `<li>${escHtml(v)}</li>`).join('')}</ul></div>` : ''}
+          ${Array.isArray(kickoff.servicos) && kickoff.servicos.length ? `<div class="section"><h3>Serviços previstos</h3><ul>${kickoff.servicos.map(v => `<li>${escHtml(v)}</li>`).join('')}</ul></div>` : ''}
+        </div>`
+      : '<div class="muted">Sem informações de kick-off.</div>';
+
+    return `
+      <section class="meeting">
+        <h2>${idx + 1}. ${escHtml(m.title || 'Sem título')}</h2>
+        <div class="meta">
+          <div><strong>Status:</strong> ${escHtml(m.status || 'Não informado')}</div>
+          <div><strong>Data:</strong> ${escHtml(fmtDate(m.date || m.createdAt || ''))}</div>
+          <div><strong>Hora:</strong> ${escHtml(m.time || 'Não informada')}</div>
+          <div><strong>Local:</strong> ${escHtml(m.location || 'Não informado')}</div>
+          <div><strong>Parecer da UTD:</strong> ${escHtml(parecerLabel(kickoff.parecer || m.parecer || m.parecerUtd) || 'Não informado')}</div>
+          <div><strong>Total de participantes:</strong> ${(m.participants || []).length}</div>
+        </div>
+        <div class="section"><h3>Pauta / Objetivos</h3><div class="box">${m.agenda || '<span class="muted">Não informado.</span>'}</div></div>
+        <div class="section"><h3>Anotações / Discussões</h3><div class="box">${m.notes || '<span class="muted">Não informado.</span>'}</div></div>
+        <div class="section"><h3>Participantes</h3>${participantes}</div>
+        <div class="section"><h3>Encaminhamentos</h3>${encaminhamentos}</div>
+        <div class="section"><h3>Kick-off / Categorização</h3>${kickoffHtml}</div>
+      </section>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Reuniões categorizadas</title><style>${css}</style></head><body><h1>Relatório de reuniões</h1><div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} · ${meetings.length} reunião(ões)</div>${htmlMeetings}</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('O navegador bloqueou a abertura do PDF. Permita pop-ups para este arquivo.', 'info');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => {
+    try { w.print(); } catch (e) {}
+  }, 350);
+  showToast('📄 Relatório aberto para salvar em PDF.');
 }
 
 function exportAllContactsData() {
