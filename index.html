@@ -790,14 +790,14 @@ body.dark .rt-editor { background:transparent !important; }
     </div>
   </div>
   <div class="header-right">
-    <button class="od-btn" id="btn-onedrive" title="Google Drive">
+    <button class="od-btn" id="btn-onedrive" title="Google Drive" onclick="openDriveModal(); return false;">
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px" onclick="openSearchModal(); return false;">🔎 <span class="btn-label-search">Busca</span></button>
     <button class="btn btn-ghost" id="btn-header-export-contacts" title="Exportar contatos">📊 <span class="btn-label-export-contacts">Contatos</span></button>
     <button class="btn btn-ghost" id="btn-header-export-meetings-pdf" title="Exportar reuniões em PDF">📄 <span class="btn-label-export-pdf">PDF</span></button>
-    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-settings" onclick="openSettingsModal(); return false;">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -3450,6 +3450,38 @@ function initInkCanvas(container, config) {
   }
 }
 
+
+function openSettingsModal() {
+  try { updateOdUI(); } catch(e) { console.warn('updateOdUI failed', e); }
+  try { initAutoSyncUI(); } catch(e) { console.warn('initAutoSyncUI failed', e); }
+  try { applyTheme(settings.theme || 'light'); } catch(e) { console.warn('applyTheme failed', e); }
+  const modal = document.getElementById('modal-settings');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function openDriveModal() {
+  openSettingsModal();
+}
+
+function openSearchModal() {
+  const modal = document.getElementById('modal-ai-search');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function bindHeaderButtonsRobustly() {
+  const map = [
+    ['btn-settings', openSettingsModal],
+    ['btn-onedrive', openDriveModal],
+    ['btn-ai-search', openSearchModal],
+  ];
+  map.forEach(([id, handler]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); handler(); return false; };
+    el.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); }, { passive: true });
+  });
+}
+
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
 document.getElementById('btn-header-export-contacts').onclick = () => {
@@ -3487,10 +3519,7 @@ document.getElementById('btn-clear-all-filters').onclick = () => {
   showToast('Filtros limpos.');
 };
 
-document.getElementById('btn-settings').onclick = () => {
-  updateOdUI();
-  document.getElementById('modal-settings').classList.remove('hidden');
-};
+document.getElementById('btn-settings').onclick = (ev) => { if (ev) { ev.preventDefault(); ev.stopPropagation(); } openSettingsModal(); return false; };
 document.getElementById('btn-settings-close').onclick = () => document.getElementById('modal-settings').classList.add('hidden');
 document.getElementById('btn-settings-save').onclick  = () => document.getElementById('modal-settings').classList.add('hidden');
 
@@ -3503,10 +3532,7 @@ document.getElementById('btn-od-upload').onclick     = async () => {
   await odSyncAll();
 };
 
-document.getElementById('btn-onedrive').onclick = () => {
-  updateOdUI();
-  document.getElementById('modal-settings').classList.remove('hidden');
-};
+document.getElementById('btn-onedrive').onclick = (ev) => { if (ev) { ev.preventDefault(); ev.stopPropagation(); } openDriveModal(); return false; };
 
 document.getElementById('btn-delete-close').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
 document.getElementById('btn-delete-cancel').onclick = () => { document.getElementById('modal-delete').classList.add('hidden'); deleteTarget=null; };
@@ -4061,6 +4087,7 @@ restoreLargestLocalDataset();
 renderSidebar();
 renderDashboard();
 restoreOdSession();
+bindHeaderButtonsRobustly();
 
 // Tema
 applyTheme(settings.theme || 'light');
@@ -4074,10 +4101,7 @@ startAutoSync();
 function updateProviderUI() {}
 
 // Inicializa UI quando settings for aberto
-document.getElementById('btn-settings').addEventListener('click', () => {
-  initAutoSyncUI();
-  applyTheme(settings.theme || 'light');
-});
+bindHeaderButtonsRobustly();
 </script>
 </body>
 </html>
