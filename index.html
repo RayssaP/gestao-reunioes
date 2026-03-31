@@ -737,22 +737,35 @@ body.dark .rt-editor { background:transparent !important; }
   @media (max-width: 760px) { .parecer-row { align-items:flex-start; flex-direction:column; gap:6px; } .parecer-name { width:100%; max-width:none; } .parecer-value { width:auto; } }
 
 
-  .dash-filter-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
-  .year-filter-card { background:var(--bg2); border:1px solid var(--bg3); border-radius:12px; padding:12px 14px; min-width:110px; cursor:pointer; transition:all .18s ease; }
+  .dash-filter-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; align-items:stretch; }
+  .year-filter-card { background:var(--bg2); border:1px solid var(--bg3); border-radius:12px; padding:8px 14px; min-width:110px; min-height:86px; cursor:pointer; transition:all .18s ease; display:flex; flex-direction:column; justify-content:center; }
   .year-filter-card:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.08); border-color:#93C5FD; }
   .year-filter-card.active { border-color:#3B82F6; background:#EFF6FF; }
-  .year-filter-top { font-size:11px; color:var(--text3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
-  .year-filter-value { font-size:22px; font-weight:700; color:#1E293B; line-height:1; }
-  .year-filter-sub { font-size:12px; color:var(--text2); margin-top:6px; }
-  .month-bars { display:flex; align-items:flex-end; gap:8px; height:170px; margin-top:4px; }
-  .month-col { flex:1; min-width:42px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .year-filter-top { font-size:10px; color:var(--text3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+  .year-filter-value { font-size:18px; font-weight:700; color:#1E293B; line-height:1; }
+  .year-filter-sub { font-size:12px; color:var(--text2); margin-top:4px; }
+  .dash-actions-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .month-bars-wrap { width:100%; overflow:hidden; }
+  .month-bars { display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); align-items:end; gap:6px; height:188px; margin-top:4px; width:100%; }
+  .month-col { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:6px; }
   .month-count { font-size:11px; color:var(--text2); font-family:var(--font-mono); }
-  .month-bar { width:100%; max-width:56px; border-radius:10px 10px 0 0; background:#3B82F6; min-height:8px; }
-  .month-label { font-size:11px; color:var(--text3); font-family:var(--font-mono); text-align:center; }
+  .month-bar { width:min(100%, 56px); border-radius:10px 10px 0 0; background:#3B82F6; min-height:8px; }
+  .month-label { font-size:11px; color:var(--text3); font-family:var(--font-mono); text-align:center; white-space:nowrap; }
   .clickable-chart-item { cursor:pointer; transition:transform .16s ease, opacity .16s ease; }
   .clickable-chart-item:hover { transform:translateY(-1px); opacity:.92; }
   .clickable-row { cursor:pointer; transition:transform .16s ease, background .16s ease; border-radius:10px; padding:6px 4px; }
   .clickable-row:hover { transform:translateY(-1px); background:rgba(59,130,246,.06); }
+
+  @media (max-width: 768px) {
+    .year-filter-card { min-width:calc(50% - 5px); min-height:78px; padding:8px 12px; }
+    .year-filter-top { font-size:10px; }
+    .year-filter-value { font-size:16px; }
+    .year-filter-sub { font-size:11px; }
+    .dash-actions-row { gap:8px; }
+    .dash-actions-row .btn { flex:1 1 calc(50% - 4px); justify-content:center; }
+    .month-bars { gap:4px; height:170px; }
+    .month-count, .month-label { font-size:10px; }
+  }
 
 </style>
 </head>
@@ -2770,12 +2783,13 @@ function renderDashboard() {
     const key = (p.email || p.name || '').trim().toLowerCase();
     if (!key) return;
     if (!peopleMap.has(key)) {
-      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
+      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), phone: (p.phone || '').trim(), orgs: new Set(), count: 0, meetings: [] });
     }
     const person = peopleMap.get(key);
     if (org) person.orgs.add(org);
+    if (!person.phone && p.phone) person.phone = String(p.phone).trim();
     person.count += 1;
-    person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
+    person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '', status: m.status || '', location: m.location || '' });
   }));
   const orgs = Object.entries(orgsMap).sort((a,b) => b[1]-a[1]);
   const uniquePeople = [...peopleMap.values()].sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -2853,8 +2867,9 @@ function renderDashboard() {
     ? `<div class="dash-list">${uniquePeople.map(person => `
         <div class="dash-list-item">
           <div class="dash-list-title">👤 ${escHtml(person.name)}</div>
-          <div class="dash-list-line"><strong>E-mail:</strong> ${escHtml(person.email || 'Não informado')}</div>
+          <div class="dash-list-line"><strong>E-mail:</strong> ${escHtml(person.email || 'Não informado')} · <strong>Telefone:</strong> ${escHtml(person.phone || 'Não informado')}</div>
           <div class="dash-list-line"><strong>Órgãos:</strong> ${escHtml([...person.orgs].sort((a,b)=>a.localeCompare(b,'pt-BR')).join(', ') || 'Não informado')} · <strong>Participações:</strong> ${person.count}</div>
+          <div class="dash-list-line"><strong>Reuniões:</strong> ${person.meetings.map(item => `${escHtml(item.title)} (${fmtDate(item.date)})`).join(' · ')}</div>
         </div>`).join('')}</div>`
     : '<div class="dash-modal-empty">Nenhuma pessoa registrada.</div>';
 
@@ -2876,6 +2891,11 @@ function renderDashboard() {
         <div class="year-filter-value">${year}</div>
         <div class="year-filter-sub">${count} reunião${count === 1 ? '' : 'ões'}</div>
       </button>`).join('')}
+  </div>
+
+  <div class="dash-actions-row dash-animate">
+    <button class="btn btn-blue" type="button" id="btn-export-all-contacts">📊 Exportar contatos</button>
+    <button class="btn btn-ghost" type="button" id="btn-export-meetings-pdf">📄 Exportar reuniões em PDF</button>
   </div>
 
   <div class="kpi-grid dash-animate">
@@ -2944,13 +2964,15 @@ function renderDashboard() {
       <div class="dash-card-head">Reuniões por mês <span style="font-size:11px;font-weight:400">${dashboardYearFilter === 'all' ? 'todos os anos somados' : 'ano filtrado'}</span></div>
       <div class="dash-card-body">
         ${monthEntries.every(meta => meta.count === 0) ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-          <div class="month-bars">
-            ${monthEntries.map(meta => `
-              <div class="month-col">
-                <div class="month-count">${meta.count}</div>
-                <div class="month-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*126))}px; opacity:${meta.count ? 1 : .28}; background:${dashboardYearFilter === 'all' ? '#3B82F6' : '#8B5CF6'}"></div>
-                <div class="month-label">${meta.label}</div>
-              </div>`).join('')}
+          <div class="month-bars-wrap">
+            <div class="month-bars">
+              ${monthEntries.map(meta => `
+                <div class="month-col">
+                  <div class="month-count">${meta.count}</div>
+                  <div class="month-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*126))}px; opacity:${meta.count ? 1 : .28}; background:${dashboardYearFilter === 'all' ? '#3B82F6' : '#8B5CF6'}"></div>
+                  <div class="month-label">${meta.label}</div>
+                </div>`).join('')}
+            </div>
           </div>`}
       </div>
     </div>
@@ -2987,6 +3009,13 @@ function renderDashboard() {
       dashboardYearFilter = card.dataset.yearFilter;
       renderDashboard();
     });
+  });
+
+  el.querySelector('#btn-export-all-contacts')?.addEventListener('click', () => {
+    exportAllContactsCSV(uniquePeople, activeYearLabel);
+  });
+  el.querySelector('#btn-export-meetings-pdf')?.addEventListener('click', () => {
+    exportMeetingsListPDF(meetingsSorted, activeYearLabel);
   });
 
   el.querySelectorAll('[data-kpi]').forEach(card => {
@@ -3130,6 +3159,121 @@ function exportContactsCSV(m) {
   a.click();
   URL.revokeObjectURL(url);
   showToast(`📊 ${participants.length} contato(s) exportados!`);
+}
+
+function exportAllContactsCSV(uniquePeople, activeYearLabel = 'todos_os_anos') {
+  if (!uniquePeople || uniquePeople.length === 0) {
+    showToast('Nenhum contato para exportar.', 'info');
+    return;
+  }
+  const header = ['Nome', 'E-mail', 'Telefone', 'Órgãos', 'Participações', 'Reunião', 'Data', 'Status', 'Local'];
+  const rows = [];
+  uniquePeople.forEach(person => {
+    if (!person.meetings || person.meetings.length === 0) {
+      rows.push([
+        person.name || '',
+        person.email || '',
+        person.phone || '',
+        [...(person.orgs || [])].join(', '),
+        person.count || 0,
+        '',
+        '',
+        '',
+        ''
+      ]);
+      return;
+    }
+    person.meetings.forEach((meeting, idx) => {
+      rows.push([
+        idx === 0 ? (person.name || '') : '',
+        idx === 0 ? (person.email || '') : '',
+        idx === 0 ? (person.phone || '') : '',
+        idx === 0 ? [...(person.orgs || [])].join(', ') : '',
+        idx === 0 ? (person.count || 0) : '',
+        meeting.title || '',
+        fmtDate(meeting.date || ''),
+        meeting.status || '',
+        meeting.location || ''
+      ]);
+    });
+  });
+
+  const csvContent = [header, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `contatos_completos_${String(activeYearLabel).replace(/\s+/g,'_').toLowerCase()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📊 ${rows.length} linha(s) exportadas de contatos!`);
+}
+
+function exportMeetingsListPDF(meetingList, activeYearLabel = 'todos os anos') {
+  if (!meetingList || meetingList.length === 0) {
+    showToast('Nenhuma reunião para exportar.', 'info');
+    return;
+  }
+  const normalizeParecerForExport = (meeting) => normalizeParecer(meeting?.kickoff && (meeting.kickoff.parecer || meeting.kickoff.parecerUtd));
+  const html = `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8"/>
+    <title>Reuniões - ${escHtml(activeYearLabel)}</title>
+    <style>
+      * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      body { font-family: Georgia, serif; color:#1E293B; margin:24px; }
+      h1 { font-size:24px; margin:0 0 6px; }
+      .sub { color:#64748B; font-size:12px; margin-bottom:18px; }
+      .meeting { border:1px solid #CBD5E1; border-radius:10px; padding:14px 16px; margin-bottom:12px; page-break-inside:avoid; }
+      .title { font-size:18px; font-weight:700; margin-bottom:6px; }
+      .meta { font-size:12px; color:#475569; margin-bottom:10px; line-height:1.6; }
+      .sec { margin-top:10px; }
+      .sec h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748B; margin:0 0 5px; }
+      .sec div, .sec li { font-size:13px; line-height:1.55; }
+      ul { margin:0; padding-left:18px; }
+      .empty { color:#94A3B8; font-style:italic; }
+    </style>
+  </head>
+  <body>
+    <h1>Lista de reuniões</h1>
+    <div class="sub">Filtro: ${escHtml(activeYearLabel)} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+    ${meetingList.map(m => `
+      <div class="meeting">
+        <div class="title">${escHtml(m.title || 'Sem título')}</div>
+        <div class="meta"><strong>Data:</strong> ${fmtDate(m.date || m.createdAt || '')} · <strong>Status:</strong> ${escHtml(m.status || 'Não informado')} · <strong>Parecer da UTD:</strong> ${escHtml(normalizeParecerForExport(m))}</div>
+        <div class="sec">
+          <h3>Participantes</h3>
+          ${(m.participants || []).length ? `<ul>${(m.participants || []).map(p => `<li>${escHtml(p.name || 'Sem nome')}${p.org ? ` — ${escHtml(p.org)}` : ''}${p.email ? ` · ${escHtml(p.email)}` : ''}${p.phone ? ` · ${escHtml(p.phone)}` : ''}</li>`).join('')}</ul>` : '<div class="empty">Nenhum participante informado.</div>'}
+        </div>
+        <div class="sec">
+          <h3>Pauta</h3>
+          <div>${plainTextForExport(m.agenda)}</div>
+        </div>
+        <div class="sec">
+          <h3>Encaminhamentos</h3>
+          ${(m.actions || []).length ? `<ul>${(m.actions || []).map(a => `<li>${escHtml(a.text || 'Sem descrição')}${a.responsible ? ` — Responsável: ${escHtml(a.responsible)}` : ''}${a.deadline ? ` — Prazo: ${fmtDate(a.deadline)}` : ''}${a.done ? ' — Concluído' : ' — Pendente'}</li>`).join('')}</ul>` : '<div class="empty">Nenhum encaminhamento informado.</div>'}
+        </div>
+      </div>`).join('')}
+    <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 150); }<\/script>
+  </body>
+  </html>`;
+  const win = window.open('', '_blank');
+  if (!win) {
+    showToast('O navegador bloqueou a janela de impressão.', 'info');
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+function plainTextForExport(value) {
+  const txt = stripHtml(value || '').replace(/\s+/g, ' ').trim();
+  return txt ? escHtml(txt) : '<span class="empty">Não informada.</span>';
 }
 
 // ===== BUSCA INSTANTÂNEA =====
