@@ -343,9 +343,6 @@
   .donut-wrap { display: flex; align-items: center; gap: 20px; }
   .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
-  .clickable-status { cursor: pointer; border-radius: 10px; padding: 6px 8px; transition: background .18s ease, transform .18s ease; }
-  .clickable-status:hover { background: rgba(148,163,184,.12); transform: translateY(-1px); }
-  .dash-column { display:flex; flex-direction:column; gap:20px; }
   .donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   /* Upcoming badge */
   .upcoming-item { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.07); cursor: pointer; }
@@ -739,26 +736,6 @@ body.dark .rt-editor { background:transparent !important; }
   .parecer-value { width:26px; text-align:right; font-size:13px; color:#1E293B; font-weight:700; }
   @media (max-width: 760px) { .parecer-row { align-items:flex-start; flex-direction:column; gap:6px; } .parecer-name { width:100%; max-width:none; } .parecer-value { width:auto; } }
 
-
-.month-bars-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;align-items:end}
-.month-col{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.month-label{font-size:10px;color:var(--text3);font-family:var(--font-mono);text-align:center;line-height:1.2;word-break:break-word}
-.mini-filter-btn{border:1px solid var(--line);background:var(--bg2);color:var(--text2);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:.2s ease}
-.mini-filter-btn:hover{border-color:var(--accent);color:var(--text)}
-.mini-filter-btn.active{background:rgba(59,130,246,.16);border-color:#3B82F6;color:#DBEAFE}
-.year-filter-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:150px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:#F8FAFC;color:var(--text2);cursor:pointer;transition:.18s ease;box-shadow:0 1px 0 rgba(15,23,42,.03)}
-.year-filter-btn:hover{transform:translateY(-1px);border-color:#CBD5E1;background:#FFFFFF}
-.year-filter-btn.active{background:#E8F0FF;border-color:#8DB3FF;box-shadow:0 0 0 2px rgba(59,130,246,.08) inset}
-.year-filter-btn__year{font-weight:800;font-size:16px;color:var(--text)}
-.year-filter-btn__count{font-size:12px;color:var(--text3);font-family:var(--font-mono)}
-.year-filter-btn.active .year-filter-btn__year{color:#1D4ED8}
-.year-filter-btn.active .year-filter-btn__count{color:#1E40AF}
-.parecer-row.clickable{cursor:pointer}
-.parecer-row.clickable:hover .parecer-name{text-decoration:underline}
-
-@media (max-width: 900px){.month-bars-grid{grid-template-columns:repeat(6,minmax(0,1fr));}}
-@media (max-width: 560px){.month-bars-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
-
 </style>
 </head>
 <body>
@@ -780,7 +757,10 @@ body.dark .rt-editor { background:transparent !important; }
       <span class="od-indicator off" id="od-indicator"></span>
       <span id="od-btn-label">Drive</span>
     </button>
-    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
+    <button class="btn btn-ghost" id="btn-export-meetings" style="gap:6px" title="Exportar todas as reuniões">⬇️ <span class="btn-label-export-meetings">Reuniões</span></button>
+    <button class="btn btn-ghost" id="btn-export-contacts" style="gap:6px" title="Exportar todos os contatos">📇 <span class="btn-label-export-contacts">Contatos</span></button>
+    <button class="btn btn-ghost" id="btn-ai-search" style="gap:6px">🔎 <span class="btn-label-search">Busca</span></button>
+    <button class="btn btn-ghost" id="btn-settings">⚙️ <span class="btn-label-cfg">Config</span></button>
     <button class="btn btn-primary" id="btn-new">+ <span class="btn-label-new">Nova Reunião</span></button>
   </div>
 </header>
@@ -2714,16 +2694,6 @@ function openDashboardListModal(title, bodyHtml) {
   });
 }
 
-
-let dashboardMonthlyYear = String(new Date().getFullYear());
-let dashboardMeetingTypeFilter = 'all';
-
-function getTimelineFilteredMeetings(list) {
-  if (dashboardMeetingTypeFilter === 'done') return list.filter(m => m.status === 'Realizada');
-  if (dashboardMeetingTypeFilter === 'pending') return list.filter(m => m.status !== 'Realizada');
-  return list;
-}
-
 function renderDashboard() {
   const el = document.getElementById('dashboard-content');
   if (!el) return;
@@ -2744,25 +2714,12 @@ function renderDashboard() {
   meetings.forEach(m => (m.participants || []).forEach(p => {
     const org = (p.org || '').trim();
     if (org) orgsMap[org] = (orgsMap[org] || 0) + 1;
-    const email = (p.email || '').trim();
-    const phone = (p.phone || p.celular || p.telefone || p.mobile || p.whatsapp || '').trim();
-    const normalizedPhone = phone.replace(/\D/g, '');
-    const nameKey = (p.name || '').trim().toLowerCase();
-    const key = (email || normalizedPhone || nameKey || '').trim().toLowerCase();
+    const key = (p.email || p.name || '').trim().toLowerCase();
     if (!key) return;
     if (!peopleMap.has(key)) {
-      peopleMap.set(key, {
-        name: (p.name || p.email || 'Sem nome').trim(),
-        email,
-        phone,
-        orgs: new Set(),
-        count: 0,
-        meetings: []
-      });
+      peopleMap.set(key, { name: (p.name || p.email || 'Sem nome').trim(), email: (p.email || '').trim(), orgs: new Set(), count: 0, meetings: [] });
     }
     const person = peopleMap.get(key);
-    if (!person.email && email) person.email = email;
-    if (!person.phone && phone) person.phone = phone;
     if (org) person.orgs.add(org);
     person.count += 1;
     person.meetings.push({ id: m.id, title: m.title || 'Sem título', date: m.date || m.createdAt || '' });
@@ -2780,9 +2737,8 @@ function renderDashboard() {
   const vencidosList = pendentesList.filter(a => a.deadline && new Date(a.deadline) < hoje)
     .sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
 
-  const timelineMeetings = getTimelineFilteredMeetings(meetings);
   const yearMap = {};
-  timelineMeetings.forEach(m => {
+  meetings.forEach(m => {
     const raw = m.date || m.createdAt;
     if (!raw) return;
     const d = new Date(raw);
@@ -2794,29 +2750,27 @@ function renderDashboard() {
   const maxYear = Math.max(1, ...yearEntries.map(([,count]) => count));
 
   const monthNamesShort = ['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
-  const currentYear = String(new Date().getFullYear());
-  const previousYear = String(Number(currentYear) - 1);
-  const availableYears = Array.from(new Set([currentYear, previousYear, ...timelineMeetings.map(m => {
-    const raw = m.date || m.createdAt;
-    const d = new Date(raw);
-    return isNaN(d) ? null : String(d.getFullYear());
-  }).filter(Boolean)])).sort((a,b) => Number(b) - Number(a));
-  if (!availableYears.includes(dashboardMonthlyYear)) dashboardMonthlyYear = availableYears.includes(currentYear) ? currentYear : (yearEntries[0]?.[0] || currentYear);
-
-  const monthlyMap = {};
-  for (let month = 0; month < 12; month++) {
-    const key = `${dashboardMonthlyYear}-${String(month+1).padStart(2,'0')}`;
-    monthlyMap[key] = { label: `${monthNamesShort[month]} ${String(dashboardMonthlyYear).slice(-2)}`, count: 0, monthIndex: month };
+  const baseMonth = new Date();
+  baseMonth.setDate(1);
+  baseMonth.setHours(0,0,0,0);
+  const rollingMonthEntries = [];
+  for (let offset = -6; offset <= 6; offset++) {
+    const d = new Date(baseMonth);
+    d.setMonth(d.getMonth() + offset);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${monthNamesShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
+    rollingMonthEntries.push([key, { label, count: 0, isCurrent: offset === 0 }]);
   }
-  timelineMeetings.forEach(m => {
+  const rollingMonthMap = Object.fromEntries(rollingMonthEntries);
+  meetings.forEach(m => {
     const raw = m.date || m.createdAt;
     if (!raw) return;
     const d = new Date(raw);
     if (isNaN(d)) return;
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (monthlyMap[key]) monthlyMap[key].count += 1;
+    if (rollingMonthMap[key]) rollingMonthMap[key].count += 1;
   });
-  const monthEntries = Object.entries(monthlyMap).sort((a,b) => a[0].localeCompare(b[0]));
+  const monthEntries = rollingMonthEntries.map(([key, meta]) => [key, rollingMonthMap[key] || meta]);
   const maxMonth = Math.max(1, ...monthEntries.map(([,meta]) => meta.count));
 
   const parecerMap = {
@@ -2825,39 +2779,8 @@ function renderDashboard() {
     'Não Aderente': 0,
     'Não informado': 0
   };
-  function extractMeetingParecer(meeting) {
-    const candidates = [
-      meeting?.kickoff?.parecer,
-      meeting?.kickoff?.parecerUtd,
-      meeting?.kickoff?.parecerUTD,
-      meeting?.kickoff?.utdParecer,
-      meeting?.parecer,
-      meeting?.parecerUtd,
-      meeting?.parecerUTD,
-      meeting?.utdParecer
-    ].filter(Boolean);
-    const normalizeParecer = (value) => {
-      const raw = String(value || '').trim();
-      if (!raw) return '';
-      const lower = raw.toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (lower.includes('aderente ao contrato')) return 'Aderente ao contrato';
-      if (lower.includes('parcialmente aderente')) return 'Parcialmente Aderente';
-      if (lower === 'nao aderente' || lower.includes('nao aderente')) return 'Não Aderente';
-      if (lower.includes('nao informado')) return 'Não informado';
-      return raw;
-    };
-    for (const c of candidates) {
-      const normalized = normalizeParecer(c);
-      if (Object.prototype.hasOwnProperty.call(parecerMap, normalized)) return normalized;
-    }
-    return '';
-  }
   meetings.forEach(m => {
-    const p = extractMeetingParecer(m);
+    const p = (m.kickoff && (m.kickoff.parecer || m.kickoff.parecerUtd)) ? (m.kickoff.parecer || m.kickoff.parecerUtd) : '';
     if (p && Object.prototype.hasOwnProperty.call(parecerMap, p)) parecerMap[p] += 1;
     else parecerMap['Não informado'] += 1;
   });
@@ -2901,7 +2824,6 @@ function renderDashboard() {
         <div class="dash-list-item">
           <div class="dash-list-title">👤 ${escHtml(person.name)}</div>
           <div class="dash-list-line"><strong>E-mail:</strong> ${escHtml(person.email || 'Não informado')}</div>
-          <div class="dash-list-line"><strong>Celular:</strong> ${escHtml(person.phone || 'Não informado')}</div>
           <div class="dash-list-line"><strong>Órgãos:</strong> ${escHtml([...person.orgs].sort((a,b)=>a.localeCompare(b,'pt-BR')).join(', ') || 'Não informado')} · <strong>Participações:</strong> ${person.count}</div>
         </div>`).join('')}</div>`
     : '<div class="dash-modal-empty">Nenhuma pessoa registrada.</div>';
@@ -2940,103 +2862,92 @@ function renderDashboard() {
   </div>
 
   <div class="dash-row dash-animate">
-    <div class="dash-column">
-      <div class="dash-card">
-        <div class="dash-card-head">Status das reuniões</div>
-        <div class="dash-card-body">
-          ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
-          <div class="donut-wrap">
-            ${(() => {
-              const size = 88, cx = 44, cy = 44, r = 34, stroke = 10;
-              const circ = 2 * Math.PI * r;
-              let offset = 0;
-              const data = [
-                { label:'Realizada', v: realizadas, color:'#22C55E' },
-                { label:'Agendada', v: agendadas, color:'#3B82F6' },
-                { label:'Adiada', v: adiadas, color:'#F59E0B' },
-                { label:'Cancelada', v: canceladas, color:'#EF4444' }
-              ];
-              const slices = data.filter(d=>d.v>0).map(d => {
-                const frac = total > 0 ? d.v / total : 0;
-                const dash = frac * circ;
-                const gap = circ - dash;
-                const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
-                offset += frac * circ;
-                return s;
-              }).join('');
-              return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
-            })()}
-            <div class="donut-legend">
-              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Realizada"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></button>
-              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Agendada"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></button>
-              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Adiada"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></button>
-              <button type="button" class="donut-legend-item clickable-status" data-status-filter="Cancelada"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></button>
-            </div>
-          </div>`}
-        </div>
-      </div>
-
-      <div class="dash-card">
-        <div class="dash-card-head">Visão mensal x ano <span style="font-size:11px;font-weight:400">filtro anual + visão mensal</span></div>
-        <div class="dash-card-body">
-          ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
-            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-              <div style="flex:1 1 320px;min-width:260px">
-                <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Ano selecionado</div>
-                <div style="display:flex;gap:12px;flex-wrap:wrap">
-                  ${yearEntries.map(([year,count]) => `
-                    <button type="button" class="year-filter-btn ${dashboardMonthlyYear === year ? 'active' : ''}" data-dash-year="${year}" aria-pressed="${dashboardMonthlyYear === year ? 'true' : 'false'}">
-                      <span class="year-filter-btn__year">${year}</span>
-                      <span class="year-filter-btn__count">${count} reunião${count > 1 ? 'ões' : ''}</span>
-                    </button>
-                  `).join('')}
-                </div>
-                <div style="margin-top:10px;font-size:13px;color:var(--text2)">Exibindo os meses de <strong>${dashboardMonthlyYear}</strong>.</div>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
-                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'all' ? 'active' : ''}" data-dash-type-filter="all">Todas</button>
-                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'done' ? 'active' : ''}" data-dash-type-filter="done">Realizadas</button>
-                <button type="button" class="mini-filter-btn ${dashboardMeetingTypeFilter === 'pending' ? 'active' : ''}" data-dash-type-filter="pending">Não realizadas</button>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês em ${dashboardMonthlyYear}</div>
-              <div class="month-bars-grid">
-                ${monthEntries.map(([,meta]) => `
-                  <div class="month-col">
-                    <div class="year-count">${meta.count}</div>
-                    <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:#3B82F6"></div>
-                    <div class="month-label">${meta.label}</div>
-                  </div>`).join('')}
-              </div>
-            </div>`}
-        </div>
+    <div class="dash-card">
+      <div class="dash-card-head">Status das reuniões</div>
+      <div class="dash-card-body">
+        ${total === 0 ? '<div class="dash-card-empty">Nenhuma reunião registrada</div>' : `
+        <div class="donut-wrap">
+          ${(() => {
+            const size = 88, cx = 44, cy = 44, r = 34, stroke = 10;
+            const circ = 2 * Math.PI * r;
+            let offset = 0;
+            const data = [
+              { label:'Realizada', v: realizadas, color:'#22C55E' },
+              { label:'Agendada', v: agendadas, color:'#3B82F6' },
+              { label:'Adiada', v: adiadas, color:'#F59E0B' },
+              { label:'Cancelada', v: canceladas, color:'#EF4444' }
+            ];
+            const slices = data.filter(d=>d.v>0).map(d => {
+              const frac = total > 0 ? d.v / total : 0;
+              const dash = frac * circ;
+              const gap = circ - dash;
+              const s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+              offset += frac * circ;
+              return s;
+            }).join('');
+            return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#334155" stroke-width="${stroke}"/>${slices}<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#F1F5F9" font-size="16" font-family="DM Mono,monospace" font-weight="700">${total}</text></svg>`;
+          })()}
+          <div class="donut-legend">
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22C55E"></div><span>Realizada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${realizadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#3B82F6"></div><span>Agendada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${agendadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#F59E0B"></div><span>Adiada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${adiadas}</span></div>
+            <div class="donut-legend-item"><div class="donut-legend-dot" style="background:#EF4444"></div><span>Cancelada</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)">${canceladas}</span></div>
+          </div>
+        </div>`}
       </div>
     </div>
-
-    <div class="dash-column">
-      <div class="dash-card">
-        <div class="dash-card-head">Principais órgãos</div>
-        <div class="dash-card-body">
-          ${orgs.length === 0 ? '<div class="dash-card-empty">Nenhum órgão registrado</div>' :
-            orgs.slice(0, 7).map(([name, count]) => `
-              <div class="org-item">
-                <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
-                <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
-              </div>`).join('')}
-        </div>
+    <div class="dash-card">
+      <div class="dash-card-head">Reuniões por ano e por mês <span style="font-size:11px;font-weight:400">histórico + janela móvel</span></div>
+      <div class="dash-card-body">
+        ${yearEntries.length === 0 ? '<div class="dash-card-empty">Nenhum dado disponível</div>' : `
+          <div style="margin-bottom:16px">
+            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por ano</div>
+            <div class="year-bars">
+              ${yearEntries.map(([year,count]) => `
+                <div class="year-col">
+                  <div class="year-count">${count}</div>
+                  <div class="year-bar" style="height:${Math.max(8, Math.round((count/maxYear)*96))}px; opacity:${count ? 1 : .35}"></div>
+                  <div class="year-label">${year}</div>
+                </div>`).join('')}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Por mês <span style="text-transform:none;letter-spacing:0;font-size:11px">6 meses antes e 6 depois do mês atual</span></div>
+            <div class="year-bars">
+              ${monthEntries.map(([,meta]) => `
+                <div class="year-col">
+                  <div class="year-count">${meta.count}</div>
+                  <div class="year-bar" style="height:${Math.max(8, Math.round((meta.count/maxMonth)*96))}px; opacity:${meta.count ? 1 : .35}; background:${meta.isCurrent ? '#8B5CF6' : '#3B82F6'}"></div>
+                  <div class="year-label">${meta.label}</div>
+                </div>`).join('')}
+            </div>
+          </div>`}
       </div>
-      <div class="dash-card">
-        <div class="dash-card-head">Parecer da UTD</div>
-        <div class="dash-card-body">
-          ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
-            ${parecerEntries.map(([label,count]) => `
-              <div class="parecer-row clickable" data-parecer-filter="${escHtml(label)}">
-                <div class="parecer-name">${escHtml(label)}</div>
-                <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
-                <div class="parecer-value">${count}</div>
-              </div>`).join('')}`}
-        </div>
+    </div>
+  </div>
+
+  <div class="dash-row dash-animate">
+    <div class="dash-card">
+      <div class="dash-card-head">Principais órgãos</div>
+      <div class="dash-card-body">
+        ${orgs.length === 0 ? '<div class="dash-card-empty">Nenhum órgão registrado</div>' :
+          orgs.slice(0, 7).map(([name, count]) => `
+            <div class="org-item">
+              <span class="org-name" title="${escHtml(name)}">🏛️ ${escHtml(name)}</span>
+              <span class="org-pill">${count} reunião${count > 1 ? 'ões' : ''}</span>
+            </div>`).join('')}
+      </div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-head">Parecer da UTD</div>
+      <div class="dash-card-body">
+        ${total === 0 ? '<div class="dash-card-empty">Sem dados para análise</div>' : `
+          ${parecerEntries.map(([label,count]) => `
+            <div class="parecer-row">
+              <div class="parecer-name">${escHtml(label)}</div>
+              <div class="parecer-track"><div class="parecer-fill" style="width:${Math.max(0, Math.round((count/maxParecer)*100))}%; opacity:${count ? 1 : .28}"></div></div>
+              <div class="parecer-value">${count}</div>
+            </div>`).join('')}`}
       </div>
     </div>
   </div>`;
@@ -3061,41 +2972,6 @@ function renderDashboard() {
       } else if (key === 'overdue') {
         openDashboardListModal('Encaminhamentos vencidos', renderActionsList(vencidosList));
       }
-    });
-  });
-
-  el.querySelectorAll('[data-status-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const status = btn.dataset.statusFilter;
-      const list = meetingsSorted.filter(m => (m.status || 'Não definido') === status);
-      const titles = { Realizada:'Reuniões realizadas', Agendada:'Reuniões agendadas', Adiada:'Reuniões adiadas', Cancelada:'Reuniões canceladas' };
-      openDashboardListModal(titles[status] || `Reuniões ${status}`, renderMeetingList(list));
-    });
-  });
-
-
-  el.querySelectorAll('[data-parecer-filter]').forEach(row => {
-    row.addEventListener('click', () => {
-      const label = row.dataset.parecerFilter;
-      const list = meetingsSorted.filter(m => {
-        const p = extractMeetingParecer(m);
-        return label === 'Não informado' ? !p || p === 'Não informado' : p === label;
-      });
-      openDashboardListModal(`Reuniões com parecer: ${label}`, renderMeetingList(list));
-    });
-  });
-
-  el.querySelectorAll('[data-dash-year]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      dashboardMonthlyYear = btn.dataset.dashYear;
-      renderDashboard();
-    });
-  });
-
-  el.querySelectorAll('[data-dash-type-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      dashboardMeetingTypeFilter = btn.dataset.dashTypeFilter;
-      renderDashboard();
     });
   });
 }
@@ -3201,6 +3077,167 @@ function exportContactsCSV(m) {
   a.click();
   URL.revokeObjectURL(url);
   showToast(`📊 ${participants.length} contato(s) exportados!`);
+}
+
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function normalizeParecerValue(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (!v) return 'nao_informado';
+  if (v === 'aderente' || v.includes('aderente ao contrato')) return 'aderente';
+  if (v === 'parcialmente_aderente' || v.includes('parcialmente aderente')) return 'parcialmente_aderente';
+  if (v === 'nao_aderente' || v === 'não_aderente' || v.includes('não aderente') || v.includes('nao aderente')) return 'nao_aderente';
+  return 'nao_informado';
+}
+
+function parecerLabel(raw) {
+  const key = normalizeParecerValue(raw);
+  return {
+    aderente: 'Aderente ao contrato',
+    parcialmente_aderente: 'Parcialmente Aderente',
+    nao_aderente: 'Não Aderente',
+    nao_informado: 'Não informado'
+  }[key] || 'Não informado';
+}
+
+function kickoffCanaisLabels(canais) {
+  return (Array.isArray(canais) ? canais : [])
+    .map(v => (KICKOFF_CANAIS.find(c => c.value === v)?.label || v))
+    .filter(Boolean);
+}
+
+function exportAllMeetingsData() {
+  if (!meetings.length) {
+    showToast('Nenhuma reunião para exportar.', 'info');
+    return;
+  }
+
+  const payload = {
+    exportadoEm: new Date().toISOString(),
+    totais: {
+      reunioes: meetings.length,
+      contatos: meetings.reduce((acc, m) => acc + ((m.participants || []).length), 0),
+      encaminhamentos: meetings.reduce((acc, m) => acc + ((m.actions || []).length), 0),
+      documentos: meetings.reduce((acc, m) => acc + ((m.documents || []).length), 0)
+    },
+    reunioes: meetings.map(m => ({
+      categoria_reuniao: {
+        id: m.id || '',
+        titulo: m.title || '',
+        status: m.status || '',
+        data: m.date || '',
+        hora: m.time || '',
+        local: m.location || '',
+        data_formatada: fmtDate(m.date),
+        criado_em: m.createdAt || '',
+        atualizado_em: m.updatedAt || ''
+      },
+      categoria_conteudo: {
+        pauta_objetivos_html: m.agenda || '',
+        anotacoes_discussoes_html: m.notes || '',
+        pauta_tem_escrita_manual: !!m.agendaInk,
+        anotacoes_tem_escrita_manual: !!m.notesInk
+      },
+      categoria_participantes: (m.participants || []).map(p => ({
+        nome: p.name || '',
+        orgao_instituicao: p.org || '',
+        email: p.email || '',
+        telefone: p.phone || ''
+      })),
+      categoria_encaminhamentos: (m.actions || []).map(a => ({
+        descricao: a.text || '',
+        responsavel: a.responsible || '',
+        prazo: a.dueDate || '',
+        prazo_formatado: fmtDate(a.dueDate),
+        concluido: !!a.done
+      })),
+      categoria_documentos: (m.documents || []).map(d => ({
+        nome: d.name || '',
+        url: d.url || '',
+        tipo: d.type || '',
+        observacao: d.notes || ''
+      })),
+      categoria_kickoff: {
+        problema: m.kickoff?.problema || '',
+        objetivo: m.kickoff?.objetivo || '',
+        publico_alvo: m.kickoff?.publicoAlvo || '',
+        processo_atual: m.kickoff?.processoAtual || '',
+        processo_definido: m.kickoff?.processoDefinido || '',
+        base_informacoes: m.kickoff?.baseInformacoes || '',
+        migracao_dados: m.kickoff?.migracaoDados || '',
+        jornada_usuario: m.kickoff?.jornadaUsuario || '',
+        dependencias: m.kickoff?.dependencias || '',
+        estimativa_volume: m.kickoff?.estimativaVolume || '',
+        canais_preferidos: kickoffCanaisLabels(m.kickoff?.canaisPreferidos),
+        possui_base_conhecimento: m.kickoff?.possuiBaseConhecimento || '',
+        prazo_externo: m.kickoff?.prazoExterno || '',
+        insumos_identificados: Array.isArray(m.kickoff?.insumos) ? m.kickoff.insumos : [],
+        servicos_previstos: Array.isArray(m.kickoff?.servicos) ? m.kickoff.servicos : [],
+        parecer_utd: parecerLabel(m.kickoff?.parecer || m.parecer || m.parecerUtd)
+      }
+    }))
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  downloadBlob(new Blob([json], { type: 'application/json;charset=utf-8' }), `reunioes_categorizadas_${new Date().toISOString().slice(0,10)}.json`);
+  showToast(`⬇️ ${meetings.length} reunião(ões) exportadas em JSON!`);
+}
+
+function exportAllContactsData() {
+  const allContacts = [];
+  const seen = new Set();
+
+  meetings.forEach(m => {
+    (m.participants || []).forEach(p => {
+      const key = [p.name || '', p.org || '', p.email || '', p.phone || ''].join('|').toLowerCase();
+      const meetingLabel = m.title || 'Sem título';
+      if (!seen.has(key)) {
+        seen.add(key);
+        allContacts.push({
+          nome: p.name || '',
+          orgao_instituicao: p.org || '',
+          email: p.email || '',
+          telefone: p.phone || '',
+          reunioes: [meetingLabel],
+          datas_reunioes: [fmtDate(m.date)]
+        });
+      } else {
+        const existing = allContacts.find(c => [c.nome, c.orgao_instituicao, c.email, c.telefone].join('|').toLowerCase() === key);
+        if (existing) {
+          if (!existing.reunioes.includes(meetingLabel)) existing.reunioes.push(meetingLabel);
+          const d = fmtDate(m.date);
+          if (!existing.datas_reunioes.includes(d)) existing.datas_reunioes.push(d);
+        }
+      }
+    });
+  });
+
+  if (!allContacts.length) {
+    showToast('Nenhum contato para exportar.', 'info');
+    return;
+  }
+
+  const header = ['Nome', 'Órgão / Instituição', 'E-mail', 'Telefone', 'Reuniões relacionadas', 'Datas das reuniões'];
+  const rows = allContacts.map(c => [
+    c.nome,
+    c.orgao_instituicao,
+    c.email,
+    c.telefone,
+    c.reunioes.join(' | '),
+    c.datas_reunioes.join(' | ')
+  ]);
+  const csv = [header, ...rows].map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';')).join('
+');
+  downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }), `contatos_gerais_${new Date().toISOString().slice(0,10)}.csv`);
+  showToast(`📇 ${allContacts.length} contato(s) exportados!`);
 }
 
 // ===== BUSCA INSTANTÂNEA =====
@@ -3484,6 +3521,8 @@ function initInkCanvas(container, config) {
 
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
+document.getElementById('btn-export-meetings').onclick = exportAllMeetingsData;
+document.getElementById('btn-export-contacts').onclick = exportAllContactsData;
 
 document.getElementById('search').oninput = e => { searchText = e.target.value; renderSidebar(); };
 
