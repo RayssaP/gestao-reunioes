@@ -1333,8 +1333,7 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
     '',
     JSON.stringify(payloadObj, null, 2),
     `--${boundary}--`
-  ].join('
-');
+  ].join('\r\n');
   const endpoint = fileId
     ? `${DRIVE_UPLOAD}/${fileId}?uploadType=multipart&supportsAllDrives=false`
     : `${DRIVE_UPLOAD}?uploadType=multipart&supportsAllDrives=false`;
