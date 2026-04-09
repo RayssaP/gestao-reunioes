@@ -1117,6 +1117,7 @@ let deleteTarget = null;
 let dashboardYearFilter = 'all';
 
 const BACKUP_KEYS = ['reunioes-data-backup', 'reunioes-data-autobackup'];
+function disableHeavyBackups(){ try { localStorage.removeItem('reunioes-data-autobackup'); localStorage.removeItem('reunioes-data-backup'); localStorage.removeItem('reunioes-data-backup-meta'); localStorage.removeItem('reunioes-data-history'); } catch {} }
 
 function normalizeMeetingArray(value) {
   return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') : [];
@@ -1156,6 +1157,46 @@ function normalizeMeetingForMerge(item) {
   return normalized;
 }
 
+
+function compactMeetingForBackup(item) {
+  const normalized = normalizeMeetingForMerge(item);
+  return {
+    ...normalized,
+    agendaInk: '',
+    notesInk: '',
+    documents: (normalized.documents || []).map(d => {
+      const clone = { ...d };
+      if ('data' in clone) delete clone.data;
+      return clone;
+    })
+  };
+}
+
+function compactMeetingArrayForBackup(list) {
+  return [];
+}
+
+function safeLocalStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    const isQuota = /quota|exceeded|storage/i.test(String(err && err.message || err));
+    if (!isQuota) throw err;
+    try {
+      if (key !== 'reunioes-data-history') localStorage.removeItem('reunioes-data-history');
+      if (key !== 'reunioes-data-autobackup') localStorage.removeItem('reunioes-data-autobackup');
+      if (key !== 'reunioes-data-backup') localStorage.removeItem('reunioes-data-backup');
+      if (key !== 'reunioes-data-backup-meta') localStorage.removeItem('reunioes-data-backup-meta');
+      localStorage.setItem(key, value);
+      return true;
+    } catch (err2) {
+      console.warn('Falha ao salvar em localStorage para a chave', key, err2);
+      return false;
+    }
+  }
+}
+
 function readMeetingsKey(key) {
   try {
     return normalizeMeetingArray(JSON.parse(localStorage.getItem(key) || '[]'));
@@ -1164,17 +1205,7 @@ function readMeetingsKey(key) {
   }
 }
 
-function backupMeetings(reason = 'manual') {
-  try {
-    const safe = normalizeMeetingArray(meetings);
-    localStorage.setItem('reunioes-data-backup', JSON.stringify(safe));
-    localStorage.setItem('reunioes-data-backup-meta', JSON.stringify({ reason, savedAt: new Date().toISOString(), count: safe.length }));
-    const historyRaw = localStorage.getItem('reunioes-data-history');
-    const history = Array.isArray(JSON.parse(historyRaw || '[]')) ? JSON.parse(historyRaw || '[]') : [];
-    history.unshift({ reason, savedAt: new Date().toISOString(), count: safe.length, meetings: safe });
-    localStorage.setItem('reunioes-data-history', JSON.stringify(history.slice(0, 8)));
-  } catch {}
-}
+function backupMeetings(reason = 'manual') { return false; }
 
 
 function getLocalMeetingsSnapshot() {
@@ -1186,12 +1217,12 @@ function getLocalMeetingsSnapshot() {
 }
 
 function restoreLargestLocalDataset() {
+  disableHeavyBackups();
   const best = getLocalMeetingsSnapshot();
   meetings = normalizeMeetingArray(best);
-  localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-  localStorage.setItem('reunioes-data-autobackup', JSON.stringify(meetings));
-  if (meetings.length) backupMeetings('startup-restore-largest-local');
+  safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
 }
+
 
 function pickNewestMeeting(a, b) {
   const aTime = new Date(a?.updatedAt || a?.modifiedAt || a?.createdAt || a?.date || 0).getTime() || 0;
@@ -1498,7 +1529,7 @@ async function odLoadAll() {
     const fileId = await gdFindDataFile(folderId);
     if (!fileId) {
       meetings = localMeetings;
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
       renderSidebar();
       renderDashboard();
       await odSyncAll();
@@ -1514,7 +1545,7 @@ async function odLoadAll() {
 
     if (localCount > driveCount) {
       meetings = mergeMeetingsPreferNewest(localMeetings, driveMeetings);
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
       settings.syncPending = false;
       saveSettings();
       backupMeetings('drive-merge-local-won');
@@ -1522,7 +1553,7 @@ async function odLoadAll() {
       showToast(`☁️ O Drive tinha ${driveCount} reunião(ões), mas este navegador tinha ${localCount}. Mantive a base local mais completa e atualizei o Drive.`, 'info');
     } else {
       meetings = mergeMeetingsPreferNewest(driveMeetings, localMeetings);
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
       backupMeetings('drive-load');
       showToast(`☁️ ${meetings.length} reuniões carregadas/mescladas com o Google Drive!`);
     }
@@ -1648,7 +1679,7 @@ function updateOdUI() {
 }
 
 // ── Override save ──
-function save() { localStorage.setItem('reunioes-data', JSON.stringify(meetings)); localStorage.setItem('reunioes-data-autobackup', JSON.stringify(normalizeMeetingArray(meetings))); backupMeetings('save'); }
+function save() { disableHeavyBackups(); safeLocalStorageSet('reunioes-data', JSON.stringify(meetings)); }
 function saveSettings() { localStorage.setItem('reunioes-settings', JSON.stringify(settings)); }
 
 // ===== TEMA (claro / escuro / sistema) =====
@@ -2194,7 +2225,7 @@ function renderDetail(m) {
       const meeting = meetings.find(x => x.id === m.id);
       if (!meeting || !meeting.actions[idx]) return;
       meeting.actions[idx].done = !meeting.actions[idx].done;
-      localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+      safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
       if (hasValidGoogleToken()) odSaveMeeting(meeting);
       renderSidebar();
       renderDetail(meeting);
@@ -2224,7 +2255,7 @@ function renderDetail(m) {
           email: document.getElementById('edit-p-email').value.trim(),
           phone: document.getElementById('edit-p-phone').value.trim()
         };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
         if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
@@ -2235,7 +2266,7 @@ function renderDetail(m) {
       document.getElementById('btn-edit-participant-delete').onclick = () => {
         if (!confirm(`Remover "${p.name}" da reunião?`)) return;
         meeting.participants.splice(idx, 1);
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
         if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-participant').classList.add('hidden');
         renderSidebar();
@@ -2266,7 +2297,7 @@ function renderDetail(m) {
           deadline:    document.getElementById('edit-action-deadline').value,
           done:        document.getElementById('edit-action-done').checked
         };
-        localStorage.setItem('reunioes-data', JSON.stringify(meetings));
+        safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
         if (hasValidGoogleToken()) odSaveMeeting(meeting);
         document.getElementById('modal-edit-action').classList.add('hidden');
         renderSidebar();
@@ -3963,6 +3994,8 @@ function bindHeaderButtonsRobustly() {
   });
 }
 
+disableHeavyBackups();
+
 // ===== EVENTS =====
 document.getElementById('btn-new').onclick = () => openForm(null);
 document.getElementById('btn-header-export-contacts').onclick = () => {
@@ -4362,8 +4395,8 @@ function getLocalDatasetUpdatedAt(list = null) {
 
 function applyMeetingsToDevice(list, reason = 'sync') {
   meetings = normalizeMeetingArray(list).map(item => normalizeMeetingForMerge(item));
-  localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-  localStorage.setItem('reunioes-data-autobackup', JSON.stringify(meetings));
+  safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
+  safeLocalStorageSet('reunioes-data-autobackup', JSON.stringify(compactMeetingArrayForBackup(meetings)));
   settings.localDatasetUpdatedAt = computeDatasetUpdatedAt(meetings, new Date().toISOString());
   saveSettings();
   backupMeetings(reason);
@@ -4378,8 +4411,8 @@ saveSettings = function() {
 
 save = function() {
   meetings = normalizeMeetingArray(meetings).map(item => normalizeMeetingForMerge(item));
-  localStorage.setItem('reunioes-data', JSON.stringify(meetings));
-  localStorage.setItem('reunioes-data-autobackup', JSON.stringify(meetings));
+  safeLocalStorageSet('reunioes-data', JSON.stringify(meetings));
+  safeLocalStorageSet('reunioes-data-autobackup', JSON.stringify(compactMeetingArrayForBackup(meetings)));
   settings.localDatasetUpdatedAt = computeDatasetUpdatedAt(meetings, new Date().toISOString());
   saveSettings();
   backupMeetings('save');
@@ -4586,3 +4619,4 @@ bindHeaderButtonsRobustly();
 </script>
 </body>
 </html>
+
