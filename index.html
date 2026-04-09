@@ -1101,7 +1101,7 @@ body.dark .rt-editor { background:transparent !important; }
 <!-- TOAST -->
 <div id="toast"></div>
 
-<input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv" style="display:none"/>
+<input type="file" id="file-input" style="display:none"/>
 
 <script>
 // ===== STATE =====
@@ -1385,6 +1385,54 @@ async function uploadDriveJson(fileId, folderId, payloadObj) {
   settings.gdFileId = data.id;
   saveSettings();
   return data.id;
+}
+
+
+
+async function uploadDriveBinaryFile(file, description='') {
+  const folderId = await ensureFolder();
+  const metadata = { name: file.name, parents: [folderId] };
+  const boundary = '-------drivebinaryuploadboundary';
+  const fileBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(fileBuffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  const base64Data = btoa(binary);
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    JSON.stringify(metadata),
+    `--${boundary}`,
+    `Content-Type: ${file.type || 'application/octet-stream'}`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64Data,
+    `--${boundary}--`
+  ].join('\r\n');
+
+  const r = await gfetch(`${DRIVE_UPLOAD}?uploadType=multipart&supportsAllDrives=false&fields=id,name,webViewLink,webContentLink,mimeType,size`, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`Falha ao enviar arquivo ao Google Drive (${r.status}). ${txt.slice(0,160)}`);
+  }
+  const data = await r.json();
+  return {
+    name: file.name,
+    description,
+    size: Number(data.size || file.size || 0),
+    type: data.mimeType || file.type || '',
+    driveFileId: data.id,
+    url: data.webViewLink || data.webContentLink || '',
+    cloud: true
+  };
 }
 
 async function odSaveIndex() {
@@ -2672,197 +2720,6 @@ function renderActionsTab(c) {
   }
 }
 
-
-function addDocumentToForm(doc) {
-  formData.documents = formData.documents || [];
-  formData.documents.push(doc);
-}
-
-function makeClipboardImageName() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  return `imagem_colada_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
-}
-
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = ev => resolve(ev.target.result);
-    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function extractClipboardImageData(event) {
-  const clipboard = event.clipboardData || window.clipboardData;
-  if (!clipboard) return null;
-
-  const items = Array.from(clipboard.items || []);
-  for (const item of items) {
-    if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
-      const file = item.getAsFile();
-      if (!file) continue;
-      const dataUrl = await readFileAsDataURL(file);
-      return {
-        name: file.name || makeClipboardImageName(),
-        description: '',
-        size: file.size || 0,
-        type: file.type || 'image/png',
-        data: dataUrl
-      };
-    }
-  }
-
-  const html = clipboard.getData && clipboard.getData('text/html');
-  if (html) {
-    const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (match && match[1] && match[1].startsWith('data:image/')) {
-      return {
-        name: makeClipboardImageName(),
-        description: '',
-        type: 'image/png',
-        data: match[1]
-      };
-    }
-  }
-
-  const text = clipboard.getData && clipboard.getData('text/plain');
-  if (text && text.startsWith('data:image/')) {
-    return {
-      name: makeClipboardImageName(),
-      description: '',
-      type: 'image/png',
-      data: text
-    };
-  }
-
-  return null;
-}
-
-
-
-async function compressImageFile(file, opts = {}) {
-  const maxDim = opts.maxDim || 1600;
-  const quality = opts.quality || 0.82;
-  const type = 'image/jpeg';
-  const img = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  let { width, height } = img;
-  const scale = Math.min(1, maxDim / Math.max(width, height));
-  width = Math.max(1, Math.round(width * scale));
-  height = Math.max(1, Math.round(height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, width, height);
-  const dataUrl = canvas.toDataURL(type, quality);
-  const size = Math.round((dataUrl.length * 3) / 4);
-  const safeName = (file.name || makeClipboardImageName()).replace(/\.[^.]+$/, '') + '.jpg';
-  return { name: safeName, type, size, data: dataUrl };
-}
-
-async function prepareDocumentFromFile(file, description) {
-  if (!file) return null;
-  const isImage = (file.type || '').startsWith('image/');
-  if (isImage) {
-    const compressed = await compressImageFile(file);
-    return { ...compressed, description };
-  }
-  const dataUrl = await readFileAsDataURL(file);
-  return { name: file.name || 'anexo', description, size: file.size, type: file.type, data: dataUrl };
-}
-
-
-function dataURLToBlob(dataUrl) {
-  const parts = String(dataUrl || '').split(',');
-  const meta = parts[0] || '';
-  const mimeMatch = meta.match(/data:([^;]+);base64/i);
-  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-  const binary = atob(parts[1] || '');
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
-}
-
-async function uploadDocumentToDrive(fileOrBlob, name, description) {
-  const folderId = await ensureFolder();
-  const safeName = name || 'anexo';
-  const mimeType = (fileOrBlob && fileOrBlob.type) || 'application/octet-stream';
-  const metadata = {
-    name: safeName,
-    parents: [folderId],
-    description: description || ''
-  };
-  const boundary = '-------314159265358979323846';
-  const preamble =
-    `--${boundary}\r\n` +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify(metadata) + '\r\n' +
-    `--${boundary}\r\n` +
-    `Content-Type: ${mimeType}\r\n\r\n`;
-  const closing = `\r\n--${boundary}--`;
-  const body = new Blob([preamble, fileOrBlob, closing], { type: `multipart/related; boundary=${boundary}` });
-  const r = await gfetch(`${DRIVE_UPLOAD}?uploadType=multipart&supportsAllDrives=false&fields=id,name,webViewLink,webContentLink,mimeType,size,modifiedTime`, {
-    method: 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body
-  });
-  if (!r.ok) {
-    const errText = await r.text().catch(() => '');
-    throw new Error(`Falha ao enviar anexo para o Drive (${r.status}). ${errText.slice(0,160)}`);
-  }
-  const data = await r.json();
-  return {
-    name: safeName,
-    description: description || '',
-    type: data.mimeType || mimeType,
-    size: Number(data.size || (fileOrBlob && fileOrBlob.size) || 0),
-    driveFileId: data.id,
-    url: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
-    webContentLink: data.webContentLink || ''
-  };
-}
-
-async function makeCloudDocumentFromFile(file, description) {
-  const driveReady = hasValidGoogleToken() || !!settings.odClientId;
-  if (!driveReady) return null;
-  try {
-    if (!hasValidGoogleToken()) await ensureGoogleAccess(false);
-    let uploadFile = file;
-    if ((file.type || '').startsWith('image/')) {
-      const compressed = await compressImageFile(file);
-      uploadFile = new File([dataURLToBlob(compressed.data)], compressed.name || file.name || 'imagem.jpg', { type: compressed.type || 'image/jpeg' });
-    }
-    return await uploadDocumentToDrive(uploadFile, uploadFile.name || file.name || 'anexo', description);
-  } catch (err) {
-    throw err;
-  }
-}
-
-async function makeCloudDocumentFromDataUrl(dataUrl, name, description) {
-  const driveReady = hasValidGoogleToken() || !!settings.odClientId;
-  if (!driveReady) return null;
-  if (!hasValidGoogleToken()) await ensureGoogleAccess(false);
-  const blob = dataURLToBlob(dataUrl);
-  const safeName = name || makeClipboardImageName();
-  let uploadBlob = blob;
-  let uploadName = safeName;
-  if ((blob.type || '').startsWith('image/')) {
-    uploadBlob = new File([blob], safeName, { type: blob.type || 'image/png' });
-  }
-  return await uploadDocumentToDrive(uploadBlob, uploadName, description);
-}
-
 function renderDocsTab(c) {
   c.innerHTML = `
     <div class="add-form">
@@ -2872,90 +2729,71 @@ function renderDocsTab(c) {
         <button class="btn btn-blue" id="d-file" style="justify-content:center">📁 Selecionar Arquivo</button>
         <button class="btn btn-ghost" id="d-name-add" style="justify-content:center">+ Adicionar por Nome</button>
       </div>
-      <input class="inp" id="d-name" placeholder="Ou digite o nome/link do documento" style="margin-bottom:10px"/>
-      <div id="d-paste-zone" tabindex="0" style="border:2px dashed var(--bg3);border-radius:12px;padding:14px 12px;text-align:center;background:var(--bg2);color:var(--text2);font-size:13px;line-height:1.6">
-        🖼️ Cole uma imagem aqui para anexar<br>
-        <span style="font-size:11px;color:var(--text3);font-family:var(--font-mono)">Com Drive conectado, imagens vão direto para a nuvem</span>
-      </div>
+      <input class="inp" id="d-name" placeholder="Ou digite o nome/link do documento"/>
+      <div style="margin-top:8px;font-size:12px;color:var(--text3)">Se o Drive estiver conectado, imagens e arquivos serão enviados direto para a nuvem.</div>
     </div>
     <div id="d-list"></div>
   `;
-  const descInput = c.querySelector('#d-desc');
-  const fi = document.getElementById('file-input');
 
-  const handleFile = async (file) => {
+  async function handlePickedFile(file) {
     if (!file) return;
+    const description = c.querySelector('#d-desc').value || '';
+    formData.documents = formData.documents || [];
     try {
-      let doc = null;
-      if (hasValidGoogleToken() || settings.odClientId) {
-        doc = await makeCloudDocumentFromFile(file, descInput.value);
+      if (hasValidGoogleToken()) {
+        showToast('Enviando arquivo para o Drive...', 'info');
+        const doc = await uploadDriveBinaryFile(file, description);
+        formData.documents.push(doc);
+        showToast('☁️ Arquivo salvo no Drive!');
+      } else {
+        const reader = new FileReader();
+        await new Promise((resolve, reject) => {
+          reader.onload = ev => {
+            formData.documents.push({
+              name: file.name,
+              description,
+              size: file.size,
+              type: file.type,
+              data: ev.target.result
+            });
+            resolve();
+          };
+          reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+          reader.readAsDataURL(file);
+        });
+        showToast('Arquivo anexado localmente.', 'info');
       }
-      if (!doc) doc = await prepareDocumentFromFile(file, descInput.value);
-      addDocumentToForm(doc);
-      descInput.value = '';
+      c.querySelector('#d-desc').value = '';
+      const nameInp = c.querySelector('#d-name');
+      if (nameInp) nameInp.value = '';
       renderDList();
+    } catch (err) {
+      showToast(err.message || 'Erro ao anexar arquivo.', 'info');
+    }
+  }
+
+  renderDList();
+
+  c.querySelector('#d-file').onclick = () => {
+    const fi = document.getElementById('file-input');
+    fi.onchange = async e => {
+      const file = e.target.files && e.target.files[0];
       fi.value = '';
-      showToast(doc.driveFileId ? 'Arquivo enviado para a nuvem com sucesso!' : ((file.type || '').startsWith('image/') ? 'Imagem anexada com sucesso!' : 'Documento anexado com sucesso!'));
-    } catch (err) {
-      showToast('Não foi possível enviar o arquivo para o Drive. ' + (err.message || err), 'info');
-    }
+      await handlePickedFile(file);
+    };
+    fi.click();
   };
-
-  const handlePaste = async (e) => {
-    try {
-      const rawDoc = await extractClipboardImageData(e);
-      if (!rawDoc) return;
-      e.preventDefault();
-      let doc = null;
-      if (hasValidGoogleToken() || settings.odClientId) {
-        if (rawDoc.file) doc = await makeCloudDocumentFromFile(rawDoc.file, descInput.value);
-        else if (rawDoc.data) doc = await makeCloudDocumentFromDataUrl(rawDoc.data, rawDoc.name, descInput.value);
-      }
-      if (!doc) {
-        doc = rawDoc.file ? await prepareDocumentFromFile(rawDoc.file, descInput.value) : { ...rawDoc, description: descInput.value };
-      }
-      addDocumentToForm(doc);
-      descInput.value = '';
-      renderDList();
-      showToast(doc.driveFileId ? 'Imagem enviada para a nuvem com sucesso!' : 'Imagem colada e anexada com sucesso!');
-    } catch (err) {
-      showToast('Não foi possível colar/enviar a imagem. ' + (err.message || ''), 'info');
-    }
-  };
-
-  fi.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    handleFile(file);
-  };
-
-  c.querySelector('#d-file').onclick = () => fi.click();
 
   c.querySelector('#d-name-add').onclick = () => {
     const name = c.querySelector('#d-name').value.trim();
     if (!name) return;
+    formData.documents = formData.documents || [];
     const isUrl = /^https?:\/\//i.test(name);
-    addDocumentToForm({ name: isUrl ? name : name, description: descInput.value, url: isUrl ? name : null });
-    c.querySelector('#d-name').value=''; descInput.value='';
+    formData.documents.push({ name: isUrl ? name : name, description: c.querySelector('#d-desc').value, url: isUrl ? name : null });
+    c.querySelector('#d-name').value='';
+    c.querySelector('#d-desc').value='';
     renderDList();
   };
-
-  const pasteZone = c.querySelector('#d-paste-zone');
-  pasteZone.addEventListener('paste', handlePaste);
-  pasteZone.addEventListener('click', () => pasteZone.focus());
-  pasteZone.addEventListener('dragover', e => {
-    e.preventDefault();
-    pasteZone.style.borderColor = 'var(--accent)';
-  });
-  pasteZone.addEventListener('dragleave', () => {
-    pasteZone.style.borderColor = 'var(--bg3)';
-  });
-  pasteZone.addEventListener('drop', async e => {
-    e.preventDefault();
-    pasteZone.style.borderColor = 'var(--bg3)';
-    const file = e.dataTransfer?.files?.[0];
-    if (file) await handleFile(file);
-  });
 
   function renderDList() {
     const dl = c.querySelector('#d-list');
@@ -2973,9 +2811,8 @@ function renderDocsTab(c) {
       </div>`).join('');
     dl.querySelectorAll('[data-di]').forEach(b => b.onclick = () => { formData.documents.splice(+b.dataset.di,1); renderDList(); });
   }
-
-  renderDList();
 }
+
 
 function renderRefsTab(c) {
   const others = meetings.filter(r => r.id !== formData.id);
@@ -3023,17 +2860,7 @@ function saveForm() {
     meetings.unshift(formData);
     selectedId = formData.id;
   }
-  try {
-    save();
-  } catch (err) {
-    const msg = String(err && err.message || err || '');
-    if (/quota|storage/i.test(msg)) {
-      showToast('A imagem anexada ficou grande demais para salvar no aparelho. Eu reduzi o tamanho na nova versão, mas esta tentativa excedeu o limite do navegador.', 'info');
-    } else {
-      showToast('Erro ao salvar a reunião: ' + msg, 'info');
-    }
-    return;
-  }
+  save();
   if (hasValidGoogleToken()) {
     odSaveMeeting(formData);
     showToast('Reunião salva com sucesso!');
