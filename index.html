@@ -1101,7 +1101,7 @@ body.dark .rt-editor { background:transparent !important; }
 <!-- TOAST -->
 <div id="toast"></div>
 
-<input type="file" id="file-input" style="display:none"/>
+<input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv" style="display:none"/>
 
 <script>
 // ===== STATE =====
@@ -2672,6 +2672,74 @@ function renderActionsTab(c) {
   }
 }
 
+
+function addDocumentToForm(doc) {
+  formData.documents = formData.documents || [];
+  formData.documents.push(doc);
+}
+
+function makeClipboardImageName() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `imagem_colada_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => resolve(ev.target.result);
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function extractClipboardImageData(event) {
+  const clipboard = event.clipboardData || window.clipboardData;
+  if (!clipboard) return null;
+
+  const items = Array.from(clipboard.items || []);
+  for (const item of items) {
+    if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (!file) continue;
+      const dataUrl = await readFileAsDataURL(file);
+      return {
+        name: file.name || makeClipboardImageName(),
+        description: '',
+        size: file.size || 0,
+        type: file.type || 'image/png',
+        data: dataUrl
+      };
+    }
+  }
+
+  const html = clipboard.getData && clipboard.getData('text/html');
+  if (html) {
+    const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (match && match[1] && match[1].startsWith('data:image/')) {
+      return {
+        name: makeClipboardImageName(),
+        description: '',
+        type: 'image/png',
+        data: match[1]
+      };
+    }
+  }
+
+  const text = clipboard.getData && clipboard.getData('text/plain');
+  if (text && text.startsWith('data:image/')) {
+    return {
+      name: makeClipboardImageName(),
+      description: '',
+      type: 'image/png',
+      data: text
+    };
+  }
+
+  return null;
+}
+
+
 function renderDocsTab(c) {
   c.innerHTML = `
     <div class="add-form">
@@ -2681,44 +2749,82 @@ function renderDocsTab(c) {
         <button class="btn btn-blue" id="d-file" style="justify-content:center">📁 Selecionar Arquivo</button>
         <button class="btn btn-ghost" id="d-name-add" style="justify-content:center">+ Adicionar por Nome</button>
       </div>
-      <input class="inp" id="d-name" placeholder="Ou digite o nome/link do documento"/>
+      <input class="inp" id="d-name" placeholder="Ou digite o nome/link do documento" style="margin-bottom:10px"/>
+      <div id="d-paste-zone" tabindex="0" style="border:2px dashed var(--bg3);border-radius:12px;padding:14px 12px;text-align:center;background:var(--bg2);color:var(--text2);font-size:13px;line-height:1.6">
+        🖼️ Cole uma imagem aqui para anexar<br>
+        <span style="font-size:11px;color:var(--text3);font-family:var(--font-mono)">Ctrl+V no computador ou toque na área e use colar no celular</span>
+      </div>
     </div>
     <div id="d-list"></div>
   `;
-  renderDList();
-  c.querySelector('#d-file').onclick = () => {
-    const fi = document.getElementById('file-input');
-    fi.onchange = e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        formData.documents = formData.documents || [];
-        formData.documents.push({
-          name: file.name,
-          description: c.querySelector('#d-desc').value,
-          size: file.size,
-          type: file.type,
-          data: ev.target.result  // base64 dataURL
-        });
-        c.querySelector('#d-desc').value = '';
-        renderDList();
-        fi.value = '';
-      };
-      reader.readAsDataURL(file);
-    };
-    fi.click();
+  const descInput = c.querySelector('#d-desc');
+  const fi = document.getElementById('file-input');
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    const dataUrl = await readFileAsDataURL(file);
+    addDocumentToForm({
+      name: file.name || makeClipboardImageName(),
+      description: descInput.value,
+      size: file.size,
+      type: file.type,
+      data: dataUrl
+    });
+    descInput.value = '';
+    renderDList();
+    fi.value = '';
+    showToast('Documento anexado com sucesso!');
   };
+
+  const handlePaste = async (e) => {
+    try {
+      const doc = await extractClipboardImageData(e);
+      if (!doc) return;
+      e.preventDefault();
+      doc.description = descInput.value;
+      addDocumentToForm(doc);
+      descInput.value = '';
+      renderDList();
+      showToast('Imagem colada e anexada com sucesso!');
+    } catch (err) {
+      showToast('Não foi possível colar a imagem.', 'info');
+    }
+  };
+
+  fi.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    handleFile(file);
+  };
+
+  c.querySelector('#d-file').onclick = () => fi.click();
+
   c.querySelector('#d-name-add').onclick = () => {
     const name = c.querySelector('#d-name').value.trim();
     if (!name) return;
-    formData.documents = formData.documents || [];
-    // Se for URL, salva como link
     const isUrl = /^https?:\/\//i.test(name);
-    formData.documents.push({ name: isUrl ? name : name, description: c.querySelector('#d-desc').value, url: isUrl ? name : null });
-    c.querySelector('#d-name').value=''; c.querySelector('#d-desc').value='';
+    addDocumentToForm({ name: isUrl ? name : name, description: descInput.value, url: isUrl ? name : null });
+    c.querySelector('#d-name').value=''; descInput.value='';
     renderDList();
   };
+
+  const pasteZone = c.querySelector('#d-paste-zone');
+  pasteZone.addEventListener('paste', handlePaste);
+  pasteZone.addEventListener('click', () => pasteZone.focus());
+  pasteZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    pasteZone.style.borderColor = 'var(--accent)';
+  });
+  pasteZone.addEventListener('dragleave', () => {
+    pasteZone.style.borderColor = 'var(--bg3)';
+  });
+  pasteZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    pasteZone.style.borderColor = 'var(--bg3)';
+    const file = e.dataTransfer?.files?.[0];
+    if (file) await handleFile(file);
+  });
+
   function renderDList() {
     const dl = c.querySelector('#d-list');
     const docs = formData.documents || [];
@@ -2735,6 +2841,8 @@ function renderDocsTab(c) {
       </div>`).join('');
     dl.querySelectorAll('[data-di]').forEach(b => b.onclick = () => { formData.documents.splice(+b.dataset.di,1); renderDList(); });
   }
+
+  renderDList();
 }
 
 function renderRefsTab(c) {
