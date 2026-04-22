@@ -359,21 +359,6 @@
       margin-top: 1px;
     }
 
-    .expand-btn {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-      border-radius: 50%;
-      border: 1px solid #d6d3d1;
-      background: #fff;
-      color: #6b7280;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      cursor: pointer;
-      margin-top: 1px;
-    }
-    .expand-btn:hover { background: #f9fafb; }
-
     .card-check {
       width: 18px;
       height: 18px;
@@ -407,6 +392,10 @@
       max-height: 34px;
       overflow: hidden;
       display: block;
+    }
+
+    .card.expanded .card-preview {
+      display: none;
     }
 
     .card-preview.truncated {
@@ -1301,7 +1290,7 @@
       const { preview, truncated } = buildPreviewText(card.text, 96);
 
       const cardEl = document.createElement('div');
-      cardEl.className = `card clickable${isDone ? ' done' : ''}`;
+      cardEl.className = `card clickable${isDone ? ' done' : ''}${isExpanded ? ' expanded' : ''}`;
       cardEl.innerHTML = `
         <div class="card-top">
           <div class="card-emoji">${card.emoji}</div>
@@ -1309,7 +1298,6 @@
             <div class="card-title">${card.title}</div>
             <div class="card-time">${card.time}</div>
           </div>
-          <button class="expand-btn" title="${isExpanded ? 'Recolher' : 'Expandir'}">${isExpanded ? '−' : '+'}</button>
           <div class="card-check ${isDone ? 'checked' : ''}">${isDone ? '✓' : ''}</div>
         </div>
         <div class="card-preview ${truncated ? 'truncated' : ''}">${preview}</div>
@@ -1319,7 +1307,6 @@
           <button class="status-btn ${isDone ? 'done' : ''}">${isDone ? '✓ feito' : 'registrar'}</button>
         </div>`;
 
-      cardEl.querySelector('.expand-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(card.id); });
       cardEl.querySelector('.mini-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleExpand(card.id); });
       cardEl.querySelector('.card-preview').addEventListener('click', () => toggleExpand(card.id));
       cardEl.querySelector('.card-check').addEventListener('click', (e) => { e.stopPropagation(); toggleDone(card.id, day.key); });
