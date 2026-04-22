@@ -387,43 +387,45 @@
       padding: 0 10px 0;
       font-size: 11px;
       color: var(--slate2);
-      line-height: 1.5;
-      min-height: 34px;
-      max-height: 34px;
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
       overflow: hidden;
-      display: block;
+      min-height: 50px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
 
     .card.expanded .card-preview {
-      display: none;
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+      min-height: 0;
+      max-height: none;
     }
 
     .card-preview.truncated {
       position: relative;
-      padding-right: 22px;
+      padding-right: 12px;
     }
 
     .card-preview.truncated::after {
       content: '…';
       position: absolute;
-      right: 10px;
+      right: 0;
       bottom: 0;
       background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.95) 55%);
       padding-left: 10px;
     }
 
-    .card.done .card-preview.truncated::after {
-      background: linear-gradient(90deg, rgba(240,253,244,0), rgba(240,253,244,.95) 55%);
+    .card.expanded .card-preview.truncated::after {
+      display: none;
     }
 
-    .card-expanded {
-      padding: 8px 10px 8px;
-      border-top: 1px solid #f0ece6;
-      font-size: 11px;
-      color: var(--slate2);
-      line-height: 1.55;
-      background: rgba(250,247,242,0.75);
-      white-space: normal;
+    .card.done .card-preview.truncated::after {
+      background: linear-gradient(90deg, rgba(240,253,244,0), rgba(240,253,244,.95) 55%);
     }
 
     .card-actions {
@@ -1287,7 +1289,8 @@
 
       const isDone = !!done[card.id];
       const isExpanded = !!expanded[card.id];
-      const { preview, truncated } = buildPreviewText(card.text, 96);
+      const preview = card.text;
+      const truncated = card.text.length > 72;
 
       const cardEl = document.createElement('div');
       cardEl.className = `card clickable${isDone ? ' done' : ''}${isExpanded ? ' expanded' : ''}`;
@@ -1300,8 +1303,7 @@
           </div>
           <div class="card-check ${isDone ? 'checked' : ''}">${isDone ? '✓' : ''}</div>
         </div>
-        <div class="card-preview ${truncated ? 'truncated' : ''}">${preview}</div>
-        ${isExpanded ? `<div class="card-expanded">${card.text}</div>` : ''}
+        <div class="card-preview ${truncated && !isExpanded ? 'truncated' : ''}">${preview}</div>
         <div class="card-actions">
           <button class="mini-btn">${isExpanded ? '▲ menos' : '▼ mais'}</button>
           <button class="status-btn ${isDone ? 'done' : ''}">${isDone ? '✓ feito' : 'registrar'}</button>
