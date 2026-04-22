@@ -309,6 +309,8 @@
       overflow: hidden;
       transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
       box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
     }
 
     .card.clickable { cursor: default; }
@@ -396,6 +398,7 @@
       word-break: break-word;
       overflow-wrap: anywhere;
       white-space: normal;
+      flex: 1 1 auto;
     }
 
     .card.expanded .card-preview {
@@ -429,13 +432,19 @@
     }
 
     .card-actions {
-      padding: 6px 10px 8px;
+      padding: 8px 10px 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 8px;
       border-top: 1px solid #f4efe8;
-      margin-top: 6px;
+      margin-top: 8px;
+      margin-top: auto;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+      background: inherit;
+      flex-wrap: nowrap;
     }
 
     .mini-btn,
@@ -449,8 +458,11 @@
     .mini-btn {
       font-size: 9px;
       color: #6b7280;
-      padding: 0;
+      padding: 2px 0;
       font-weight: 500;
+      min-width: 44px;
+      text-align: left;
+      flex-shrink: 0;
     }
 
     .status-btn {
@@ -462,6 +474,8 @@
       color: #6b7280;
       font-weight: 500;
       transition: all 0.15s;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .status-btn.done {
@@ -1304,7 +1318,7 @@
           <div class="card-check ${isDone ? 'checked' : ''}">${isDone ? '✓' : ''}</div>
         </div>
         <div class="card-preview ${truncated && !isExpanded ? 'truncated' : ''}">${preview}</div>
-        <div class="card-actions">
+        <div class="card-actions compact-actions">
           <button class="mini-btn">${isExpanded ? '▲ menos' : '▼ mais'}</button>
           <button class="status-btn ${isDone ? 'done' : ''}">${isDone ? '✓ feito' : 'registrar'}</button>
         </div>`;
