@@ -900,10 +900,11 @@ body.dark .rt-editor { background:transparent !important; }
             <br><span style="color:#15803d;font-weight:700">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-blue btn-sm" id="btn-od-force-sync">🔄 Forçar sincronização agora</button>
             <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair da conta Google</button>
           </div>
           <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
-            Não há mais botões de “buscar” ou “enviar”. O sistema mantém uma base única no Drive e atualiza automaticamente após cada salvamento.
+            Não há botões de “buscar” ou “enviar”. O sistema sincroniza automaticamente após cada salvamento e também permite forçar a sincronização quando houver pendências.
           </div>
         </div>
 
@@ -978,7 +979,7 @@ body.dark .rt-editor { background:transparent !important; }
       <div>
         <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🔄 Salvamento automático</div>
         <div style="padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3);font-size:13px;color:var(--text2);line-height:1.7">
-          O sistema salva primeiro no navegador e, se houver login Google ativo, sincroniza automaticamente no Drive ao clicar em <strong>Salvar</strong> na reunião.
+          O sistema salva primeiro no navegador. Se houver login Google válido, sincroniza automaticamente no Drive ao clicar em <strong>Salvar</strong>. Se o Google falhar, o salvamento local permanece preservado e você pode usar <strong>Forçar sincronização agora</strong>.
         </div>
       </div>
 
@@ -1744,7 +1745,7 @@ async function restoreOdSession() {
     if (!settings.driveManualNoticeShown) {
       settings.driveManualNoticeShown = true;
       saveSettings();
-      showToast('Modo seguro do Drive ativo: os dados locais não serão substituídos automaticamente ao abrir. Use “Buscar do Drive” apenas quando desejar.', 'info');
+      showToast('Drive em modo seguro: os dados locais serão preservados. Use “Forçar sincronização agora” quando houver pendências.', 'info');
     }
   }
 }
@@ -3015,17 +3016,17 @@ async function saveForm() {
     return;
   }
 
-  if (hasValidGoogleToken() || settings.odClientId) {
-    await odSaveMeeting(formData);
-    if (settings.syncPending) {
-      showToast('💾 Reunião salva localmente. Clique em Drive para reconectar e concluir a sincronização.', 'info');
-    } else {
-      showToast('✅ Reunião salva e sincronizada automaticamente no Drive!');
-    }
+  const syncResult = await autoSyncAfterLocalSave(formData);
+  if (syncResult && syncResult.synced) {
+    showToast('✅ Reunião salva e sincronizada automaticamente no Drive!');
+  } else if (settings.odClientId || odTokenData) {
+    settings.syncPending = true;
+    saveSettings();
+    showToast('💾 Reunião salva no navegador. Sincronização pendente — abra Drive e clique em “Forçar sincronização agora”.', 'info');
   } else {
     settings.syncPending = true;
     saveSettings();
-    showToast('💾 Reunião salva localmente. Entre com Google para ativar a sincronização automática.', 'info');
+    showToast('💾 Reunião salva no navegador. Entre com Google para ativar a sincronização automática.', 'info');
   }
 
   renderSidebar();
@@ -4027,6 +4028,8 @@ document.getElementById('btn-settings-save').onclick  = () => document.getElemen
 
 document.getElementById('btn-od-connect').onclick = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
+const btnForceSync = document.getElementById('btn-od-force-sync');
+if (btnForceSync) btnForceSync.onclick = odForceSyncNow;
 
 document.getElementById('btn-onedrive').onclick = (ev) => { if (ev) { ev.preventDefault(); ev.stopPropagation(); } openDriveModal(); return false; };
 
@@ -4582,6 +4585,132 @@ startAutoSync = function() {
 };
 
 if (settings.autoSync === undefined) { settings.autoSync = false; settings.autoSyncInterval = 30; saveSettings(); }
+
+
+// ===== SINCRONIZAÇÃO SEGURA / FORÇADA =====
+function markDrivePending(label = 'Drive ⚠️') {
+  settings.syncPending = true;
+  saveSettings();
+  setOdStatus('err', label);
+  updateOdUI();
+}
+
+async function autoSyncAfterLocalSave(meeting) {
+  // O botão Salvar nunca deve falhar por causa do Google Drive.
+  // A reunião já foi persistida localmente; esta função apenas tenta enviar ao Drive em melhor esforço.
+  try {
+    if (!settings.odClientId) {
+      markDrivePending('Drive');
+      return { synced: false, reason: 'not_configured' };
+    }
+
+    if (!hasValidGoogleToken()) {
+      try {
+        await ensureGoogleAccess(false);
+      } catch {
+        markDrivePending('Drive ⚠️');
+        return { synced: false, reason: 'needs_reconnect' };
+      }
+    }
+
+    await odSyncAll({ silent: true, throwOnError: true });
+    settings.syncPending = false;
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateOdUI();
+    return { synced: true };
+  } catch (e) {
+    console.warn('Sincronização automática pendente:', e);
+    markDrivePending('Drive ⚠️');
+    return { synced: false, reason: 'sync_failed', error: e };
+  }
+}
+
+odSyncAll = async function(options = {}) {
+  const { silent = false, throwOnError = false } = options;
+  if (!silent) setOdStatus('syncing', 'Sincronizando…');
+  try {
+    if (!hasValidGoogleToken()) await ensureGoogleAccess(!!options.interactive);
+    await odSaveIndex();
+    settings.syncPending = false;
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateOdUI();
+    if (!silent) showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
+    return { synced: true };
+  } catch (e) {
+    markDrivePending('Erro');
+    if (!silent) showToast('Não foi possível sincronizar com o Google Drive. A base local foi preservada.', 'info');
+    if (throwOnError) throw e;
+    return { synced: false, error: e };
+  }
+};
+
+async function odForceSyncNow() {
+  setOdStatus('syncing', 'Sincronizando…');
+  try {
+    if (!settings.odClientId) {
+      const clientId = (document.getElementById('od-client-id-input')?.value || '').trim();
+      if (clientId) {
+        settings.odClientId = clientId;
+        saveSettings();
+      }
+    }
+    if (!settings.odClientId) {
+      showToast('Cole o Client ID e entre com Google antes de sincronizar.', 'info');
+      setOdStatus('off', 'Drive');
+      return;
+    }
+
+    await ensureGoogleAccess(true);
+
+    // Sincronização forçada: baixa a base do Drive, mescla com a local preservando o registro mais recente e reenviando a base unificada.
+    const localMeetings = getLocalMeetingsSnapshot();
+    let merged = normalizeMeetingArray(localMeetings).map(item => normalizeMeetingForMerge(item));
+    try {
+      const drive = await fetchDriveDataset();
+      if (drive.exists) {
+        merged = mergeMeetingsPreferNewest(merged, drive.meetings);
+      }
+    } catch (e) {
+      console.warn('Não foi possível ler o Drive antes da sincronização forçada; vou tentar enviar a base local.', e);
+    }
+
+    applyMeetingsToDevice(merged, 'drive-force-merge');
+    await odSaveIndex();
+
+    settings.syncPending = false;
+    saveSettings();
+    setOdStatus('on', 'Drive ✓');
+    updateOdUI();
+    renderSidebar();
+    renderDashboard();
+    const m = meetings.find(m => m.id === selectedId);
+    if (m) renderDetail(m);
+    showToast(`✅ Sincronização forçada concluída: ${meetings.length} reunião(ões) no Drive.`);
+  } catch (e) {
+    console.error('Falha na sincronização forçada:', e);
+    markDrivePending('Erro');
+    showToast('Não foi possível sincronizar agora. Verifique se o site está em HTTPS, se a Google Drive API está ativa e se o login foi autorizado.', 'info');
+  }
+}
+
+// Substitui as versões antigas para que falhas do Drive não apareçam como erro de salvamento.
+odSaveMeeting = async function(meeting) {
+  if (meeting) {
+    const idx = meetings.findIndex(m => m.id === meeting.id);
+    const normalizedMeeting = normalizeMeetingForMerge(meeting);
+    if (idx >= 0) meetings[idx] = normalizedMeeting;
+    else meetings.unshift(normalizedMeeting);
+    save();
+  }
+  return autoSyncAfterLocalSave(meeting);
+};
+
+odDeleteMeeting = async function() {
+  save();
+  return autoSyncAfterLocalSave(null);
+};
 
 // ===== INIT =====
 restoreLargestLocalDataset();
