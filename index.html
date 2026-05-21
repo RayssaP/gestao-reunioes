@@ -894,18 +894,16 @@ body.dark .rt-editor { background:transparent !important; }
               <div class="od-last-sync" id="od-last-sync-display">—</div>
             </div>
           </div>
-          <div style="font-size:11px;color:var(--text3);padding:8px 10px;background:var(--bg);border-radius:6px;font-family:var(--font-mono);margin-top:8px;line-height:1.6">
-            📁 Cada reunião é salva como arquivo separado em:<br>
-            <span style="color:#93c5fd">Google Drive/GestaoReunioes/reunioes.json</span>
+          <div style="font-size:12px;color:#15803d;padding:10px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-family:var(--font-mono);margin-top:10px;line-height:1.7">
+            ✅ Sincronização automática ativa.<br>
+            Toda reunião salva, editada ou excluída será sincronizada automaticamente em:
+            <br><span style="color:#15803d;font-weight:700">Google Drive/GestaoReunioes/reunioes.json</span>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-green btn-sm" id="btn-od-sync-now" style="flex:1;justify-content:center;min-width:110px">⬇️ Buscar do Drive</button>
-            <button class="btn btn-blue btn-sm" id="btn-od-upload" style="flex:1;justify-content:center;min-width:110px">⬆️ Enviar ao Drive</button>
-            <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair</button>
+            <button class="btn btn-ghost btn-sm" id="btn-od-disconnect" style="border-color:#7f1d1d;color:#fca5a5">Sair da conta Google</button>
           </div>
           <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:8px;line-height:1.7;padding:8px 10px;background:var(--bg);border-radius:6px">
-            ⬇️ <strong>Buscar do Drive</strong> — substitui os dados locais pelos do Drive<br>
-            ⬆️ <strong>Enviar ao Drive</strong> — substitui os dados do Drive pelos locais
+            Não há mais botões de “buscar” ou “enviar”. O sistema mantém uma base única no Drive e atualiza automaticamente após cada salvamento.
           </div>
         </div>
 
@@ -913,7 +911,7 @@ body.dark .rt-editor { background:transparent !important; }
         <div id="od-disconnected">
           <div style="padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1d4ed8;line-height:1.8;margin-bottom:14px">
             🌐 Para funcionar bem, hospede este arquivo como site <strong>https://</strong> (Cloudflare Pages, GitHub Pages etc.).<br>
-            Depois conecte sua conta Google e sincronize tudo pelo Drive.
+            Depois clique em <strong>Entrar com Google</strong>. A partir daí, cada reunião salva será sincronizada automaticamente no Drive.
           </div>
 
           <details style="margin-bottom:14px">
@@ -976,29 +974,11 @@ body.dark .rt-editor { background:transparent !important; }
 
       <hr style="border:none;border-top:1px solid var(--bg3)"/>
 
-      <!-- AUTO-SYNC -->
+      <!-- AUTO-SYNC: automático por evento de salvamento, sem controles manuais -->
       <div>
-        <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🔄 Sincronização automática</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3)">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--text)">Sincronizar em segundo plano</div>
-            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:2px">Busca dados do Drive automaticamente</div>
-          </div>
-          <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
-            <input type="checkbox" id="toggle-autosync" style="opacity:0;width:0;height:0;position:absolute"/>
-            <span id="autosync-slider" style="position:absolute;inset:0;border-radius:24px;background:#CBD5E1;cursor:pointer;transition:.3s">
-              <span style="position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.3s;display:block" id="autosync-knob"></span>
-            </span>
-          </label>
-        </div>
-        <div id="autosync-interval-row" style="margin-top:8px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3)">
-          <span style="font-size:13px;color:var(--text2)">Intervalo:</span>
-          <select class="inp" id="autosync-interval" style="flex:1;padding:7px 10px;font-size:13px">
-            <option value="1">A cada 1 minuto</option>
-            <option value="5">A cada 5 minutos</option>
-            <option value="10">A cada 10 minutos</option>
-            <option value="30" selected>A cada 30 minutos</option>
-          </select>
+        <div style="font-size:12px;font-family:var(--font-mono);color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">🔄 Salvamento automático</div>
+        <div style="padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3);font-size:13px;color:var(--text2);line-height:1.7">
+          O sistema salva primeiro no navegador e, se houver login Google ativo, sincroniza automaticamente no Drive ao clicar em <strong>Salvar</strong> na reunião.
         </div>
       </div>
 
@@ -3008,10 +2988,12 @@ function renderRefsTab(c) {
   });
 }
 
-function saveForm() {
+async function saveForm() {
   if (!formData.title || !formData.title.trim()) {
     showToast('Informe o título da reunião', 'info'); return;
   }
+  formData.updatedAt = new Date().toISOString();
+
   if (formData.id) {
     meetings = meetings.map(m => m.id===formData.id ? formData : m);
     selectedId = formData.id;
@@ -3032,14 +3014,20 @@ function saveForm() {
     }
     return;
   }
-  if (hasValidGoogleToken()) {
-    odSaveMeeting(formData);
-    showToast('Reunião salva com sucesso!');
+
+  if (hasValidGoogleToken() || settings.odClientId) {
+    await odSaveMeeting(formData);
+    if (settings.syncPending) {
+      showToast('💾 Reunião salva localmente. Clique em Drive para reconectar e concluir a sincronização.', 'info');
+    } else {
+      showToast('✅ Reunião salva e sincronizada automaticamente no Drive!');
+    }
   } else {
     settings.syncPending = true;
     saveSettings();
-    showToast('💾 Salvo localmente. Reconecte ao Drive para sincronizar.', 'info');
+    showToast('💾 Reunião salva localmente. Entre com Google para ativar a sincronização automática.', 'info');
   }
+
   renderSidebar();
   const m = meetings.find(m=>m.id===selectedId);
   if (m) renderDetail(m);
@@ -4037,14 +4025,8 @@ document.getElementById('btn-settings').onclick = (ev) => { if (ev) { ev.prevent
 document.getElementById('btn-settings-close').onclick = () => document.getElementById('modal-settings').classList.add('hidden');
 document.getElementById('btn-settings-save').onclick  = () => document.getElementById('modal-settings').classList.add('hidden');
 
-document.getElementById('btn-od-connect').onclick    = odConnect;
+document.getElementById('btn-od-connect').onclick = odConnect;
 document.getElementById('btn-od-disconnect').onclick = odDisconnect;
-document.getElementById('btn-od-sync-now').onclick   = () => { odLoadAll(); document.getElementById('modal-settings').classList.add('hidden'); };
-document.getElementById('btn-od-upload').onclick     = async () => {
-  if (!confirm(`Enviar ${meetings.length} reunião(ões) deste dispositivo para o Drive?\n\nIsso irá SUBSTITUIR os dados que estão no Drive.`)) return;
-  document.getElementById('modal-settings').classList.add('hidden');
-  await odSyncAll();
-};
 
 document.getElementById('btn-onedrive').onclick = (ev) => { if (ev) { ev.preventDefault(); ev.stopPropagation(); } openDriveModal(); return false; };
 
@@ -4060,12 +4042,17 @@ document.getElementById('btn-delete-confirm').onclick = async () => {
     document.getElementById('modal-delete').classList.add('hidden');
     renderSidebar();
     showView('empty');
-    showToast('Reunião removida.', 'info');
     if (odTokenData || settings.odClientId) {
       try {
         await ensureGoogleAccess(false);
       } catch(e) {}
       await odDeleteMeeting();
+      if (settings.syncPending) showToast('Reunião removida localmente. Reconecte ao Drive para sincronizar a exclusão.', 'info');
+      else showToast('Reunião removida e sincronizada no Drive.', 'info');
+    } else {
+      settings.syncPending = true;
+      saveSettings();
+      showToast('Reunião removida localmente. Entre com Google para sincronizar.', 'info');
     }
   }
 };
@@ -4594,7 +4581,7 @@ startAutoSync = function() {
   }, mins * 60 * 1000);
 };
 
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
+if (settings.autoSync === undefined) { settings.autoSync = false; settings.autoSyncInterval = 30; saveSettings(); }
 
 // ===== INIT =====
 restoreLargestLocalDataset();
@@ -4609,8 +4596,7 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
   btn.onclick = () => setTheme(btn.dataset.theme);
 });
 
-// Auto-sync configurável
-startAutoSync();
+// Sincronização automática por salvamento: não há rotina periódica de buscar/enviar manualmente.
 
 function updateProviderUI() {}
 
