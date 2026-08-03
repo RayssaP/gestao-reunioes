@@ -213,6 +213,9 @@
   .form-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
   .form-title { font-size: 24px; font-weight: 700; color: #1E293B; }
   .form-header-btns { display: flex; gap: 10px; }
+  .draft-status { font-size:12px; color:var(--text3); font-family:var(--font-mono); margin-right:4px; white-space:nowrap; }
+  .draft-status.saving { color:var(--warning); }
+  .draft-status.saved { color:var(--green); }
 
   /* TABS */
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--bg3); margin-bottom: 20px; }
@@ -1277,6 +1280,111 @@ let currentView = 'empty';
 let filterStatus = 'Todas';
 let searchText = '';
 let formData = {};
+
+// ===== RASCUNHO AUTOMÁTICO =====
+const MEETING_DRAFT_KEY = 'reunioes-form-draft-v1';
+let meetingDraftTimer = null;
+let lastMeetingDraftJson = '';
+let restoringMeetingDraft = false;
+
+function draftFormIsOpen() {
+  const formView = document.getElementById('form-view');
+  return !!formView && formView.offsetParent !== null && Object.keys(formData || {}).length > 0;
+}
+
+function buildMeetingDraft() {
+  return {
+    version: 1,
+    savedAt: Date.now(),
+    targetId: formData.id || null,
+    activeTab: formTab || 'geral',
+    data: formData
+  };
+}
+
+function setDraftStatus(text, state='') {
+  const el = document.getElementById('draft-status');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'draft-status' + (state ? ' ' + state : '');
+}
+
+function saveMeetingDraftNow(force=false) {
+  if (!draftFormIsOpen()) return;
+  try {
+    const draft = buildMeetingDraft();
+    const json = JSON.stringify(draft);
+    if (!force && json === lastMeetingDraftJson) return;
+    setDraftStatus('Salvando rascunho…', 'saving');
+    try {
+      localStorage.setItem(MEETING_DRAFT_KEY, json);
+      lastMeetingDraftJson = json;
+    } catch (err) {
+      // Segunda tentativa sem conteúdo binário pesado de anexos.
+      const light = JSON.parse(JSON.stringify(draft));
+      light.data.documents = (light.data.documents || []).map(doc => ({
+        ...doc,
+        data: doc.data ? null : doc.data,
+        draftAttachmentOmitted: !!doc.data
+      }));
+      const lightJson = JSON.stringify(light);
+      localStorage.setItem(MEETING_DRAFT_KEY, lightJson);
+      lastMeetingDraftJson = lightJson;
+    }
+    setDraftStatus('Rascunho salvo agora', 'saved');
+  } catch (err) {
+    console.warn('Não foi possível salvar o rascunho:', err);
+    setDraftStatus('Falha ao salvar rascunho', 'saving');
+  }
+}
+
+function startMeetingDraftAutosave() {
+  if (meetingDraftTimer) clearInterval(meetingDraftTimer);
+  meetingDraftTimer = setInterval(() => saveMeetingDraftNow(false), 2000);
+}
+
+function readMeetingDraft() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MEETING_DRAFT_KEY) || 'null');
+    return parsed && parsed.data ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearMeetingDraft() {
+  localStorage.removeItem(MEETING_DRAFT_KEY);
+  lastMeetingDraftJson = '';
+  setDraftStatus('');
+}
+
+function restoreMeetingDraft(draft) {
+  if (!draft || !draft.data) return false;
+  restoringMeetingDraft = true;
+  formData = draft.data;
+  formTab = draft.activeTab || 'geral';
+  selectedId = formData.id || null;
+  renderForm();
+  showView('form');
+  restoringMeetingDraft = false;
+  lastMeetingDraftJson = JSON.stringify(draft);
+  setDraftStatus('Rascunho recuperado', 'saved');
+  return true;
+}
+
+function offerDraftRestoreOnStartup() {
+  const draft = readMeetingDraft();
+  if (!draft) return;
+  const ageHours = (Date.now() - Number(draft.savedAt || 0)) / 36e5;
+  if (ageHours > 24 * 30) return;
+  const title = draft.data.title?.trim() || 'reunião sem título';
+  setTimeout(() => {
+    if (confirm(`Encontrei um rascunho não finalizado de “${title}”. Deseja continuar de onde parou?`)) {
+      restoreMeetingDraft(draft);
+      showToast('✍️ Rascunho restaurado.');
+    }
+  }, 250);
+}
 let formTab = 'geral';
 let deleteTarget = null;
 let dashboardYearFilter = 'all';
@@ -2491,13 +2599,25 @@ function confirmDelete(m) {
 
 // ===== FORM =====
 function openForm(meeting) {
+  const draft = readMeetingDraft();
+  const targetId = meeting?.id || null;
+  const draftMatches = draft && (draft.targetId || null) === targetId;
+  if (draftMatches && !restoringMeetingDraft) {
+    const title = draft.data.title?.trim() || 'reunião sem título';
+    if (confirm(`Existe um rascunho não salvo de “${title}”. Deseja recuperá-lo?`)) {
+      restoreMeetingDraft(draft);
+      return;
+    }
+  }
   formData = meeting ? JSON.parse(JSON.stringify(meeting)) : {
     title:'', date:'', location:'', status:'Agendada',
     agenda:'', agendaInk:'', notes:'', notesInk:'', participants:[], actions:[], documents:[], references:[]
   };
   formTab = 'geral';
+  lastMeetingDraftJson = '';
   renderForm();
   showView('form');
+  saveMeetingDraftNow(true);
 }
 
 function renderForm() {
@@ -2506,7 +2626,8 @@ function renderForm() {
   el.innerHTML = `
     <div class="form-header">
       <h2 class="form-title">${isEdit?'Editar Reunião':'Nova Reunião'}</h2>
-      <div class="form-header-btns">
+      <div class="form-header-btns" style="align-items:center">
+        <span id="draft-status" class="draft-status">Rascunho automático ativo</span>
         <button class="btn btn-ghost" id="form-cancel">Cancelar</button>
         <button class="btn btn-primary" id="form-save">💾 Salvar</button>
       </div>
@@ -2521,11 +2642,16 @@ function renderForm() {
     t.addEventListener('click', () => { formTab = t.dataset.tab; renderTabContent(); updateTabBar(); });
   });
   document.getElementById('form-cancel').onclick = () => {
+    if (!confirm('Deseja descartar este rascunho? As alterações ainda não salvas serão apagadas.')) return;
+    clearMeetingDraft();
     if (selectedId) { const m = meetings.find(m=>m.id===selectedId); if(m) renderDetail(m); showView('detail'); }
     else showView('empty');
   };
   document.getElementById('form-save').onclick = saveForm;
+  el.addEventListener('input', () => saveMeetingDraftNow(false));
+  el.addEventListener('change', () => saveMeetingDraftNow(false));
   renderTabContent();
+  startMeetingDraftAutosave();
 }
 
 function updateTabBar() {
@@ -3199,6 +3325,7 @@ function saveForm() {
     }
     return;
   }
+  clearMeetingDraft();
   if (hasValidGoogleToken()) {
     odSaveMeeting(formData);
     showToast('Reunião salva com sucesso!');
@@ -4787,6 +4914,7 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ===== INIT =====
+window.addEventListener('beforeunload', () => saveMeetingDraftNow(true));
 restoreLargestLocalDataset();
 renderSidebar();
 renderDashboard();
@@ -4801,6 +4929,8 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
 
 // Auto-sync configurável
 startAutoSync();
+startMeetingDraftAutosave();
+offerDraftRestoreOnStartup();
 
 function updateProviderUI() {}
 
