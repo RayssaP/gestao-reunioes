@@ -1150,7 +1150,7 @@ body.dark .rt-editor { background:transparent !important; }
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3)">
           <div>
             <div style="font-size:13px;font-weight:600;color:var(--text)">Sincronizar em segundo plano</div>
-            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:2px">Busca dados do Drive automaticamente</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);margin-top:2px">Mantém a sessão ativa e salva no Drive a cada 1 minuto</div>
           </div>
           <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
             <input type="checkbox" id="toggle-autosync" style="opacity:0;width:0;height:0;position:absolute"/>
@@ -1161,11 +1161,8 @@ body.dark .rt-editor { background:transparent !important; }
         </div>
         <div id="autosync-interval-row" style="margin-top:8px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--bg3)">
           <span style="font-size:13px;color:var(--text2)">Intervalo:</span>
-          <select class="inp" id="autosync-interval" style="flex:1;padding:7px 10px;font-size:13px">
-            <option value="1">A cada 1 minuto</option>
-            <option value="5">A cada 5 minutos</option>
-            <option value="10">A cada 10 minutos</option>
-            <option value="30" selected>A cada 30 minutos</option>
+          <select class="inp" id="autosync-interval" disabled style="flex:1;padding:7px 10px;font-size:13px;opacity:.8">
+            <option value="1" selected>A cada 1 minuto</option>
           </select>
         </div>
       </div>
@@ -1872,6 +1869,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // ===== AUTO-SYNC CONFIGURÁVEL =====
 let autoSyncTimer = null;
+let autoSyncRunning = false;
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   if (!settings.autoSync) return;
@@ -1898,7 +1896,8 @@ function initAutoSyncUI() {
   }
 
   toggle.checked = !!settings.autoSync;
-  sel.value = String(settings.autoSyncInterval || 30);
+  settings.autoSyncInterval = 1;
+  sel.value = '1';
   updateSliderUI(!!settings.autoSync);
 
   toggle.onchange = () => {
@@ -1908,14 +1907,14 @@ function initAutoSyncUI() {
     startAutoSync();
   };
   sel.onchange = () => {
-    settings.autoSyncInterval = parseInt(sel.value);
+    settings.autoSyncInterval = 1;
     saveSettings();
     startAutoSync();
   };
 }
 
 // ── Auto-sync inicial (usa configuração salva, padrão: ligado, 30 min) ──
-if (settings.autoSync === undefined) { settings.autoSync = false; settings.autoSyncInterval = 30; saveSettings(); }
+settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings();
 
 // ── Restore session on page load ──
 async function restoreOdSession() {
@@ -4622,17 +4621,23 @@ odSaveIndex = async function() {
   updateLastSync();
 };
 
-odSyncAll = async function() {
+odSyncAll = async function(options = {}) {
+  const silent = !!options.silent;
+  if (autoSyncRunning) return;
+  autoSyncRunning = true;
   setOdStatus('syncing', 'Sincronizando…');
   try {
+    await ensureGoogleAccess(false);
     await odSaveIndex();
     setOdStatus('on', 'Drive ✓');
-    showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
+    if (!silent) showToast(`☁️ ${meetings.length} reuniões sincronizadas com o Google Drive!`);
   } catch (e) {
     settings.syncPending = true;
     saveSettings();
-    setOdStatus('err', 'Erro');
-    showToast('Erro: ' + e.message, 'info');
+    setOdStatus('err', 'Reconectar');
+    if (!silent) showToast('Erro: ' + e.message, 'info');
+  } finally {
+    autoSyncRunning = false;
   }
 };
 
@@ -4739,30 +4744,47 @@ restoreOdSession = async function() {
   const hasClientId = !!settings.odClientId;
   if (!(hasToken || hasClientId)) return;
   try {
+    await ensureGoogleAccess(false);
     await odLoadAll({ silent: true });
+    await odSyncAll({ silent: true });
+    startAutoSync();
   } catch (e) {
-    try {
-      await ensureGoogleAccess(false);
-      await odLoadAll({ silent: true });
-    } catch {
-      setOdStatus('err', 'Reconectar');
-      showToast('Não foi possível sincronizar automaticamente com o Drive. Os dados locais foram mantidos neste aparelho.', 'info');
-    }
+    setOdStatus('err', 'Reconectar');
+    showToast('A sessão do Google precisa ser renovada. Seus dados locais foram mantidos.', 'info');
   }
 };
 
 startAutoSync = function() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
-  if (!settings.autoSync) return;
-  const mins = parseInt(settings.autoSyncInterval || 30);
+  settings.autoSync = true;
+  settings.autoSyncInterval = 1;
+  saveSettings();
   autoSyncTimer = setInterval(async () => {
-    if (hasValidGoogleToken() || settings.odClientId) {
-      try { await odLoadAll({ silent: true }); } catch(e) {}
+    if (!settings.odClientId || autoSyncRunning) return;
+    try {
+      await ensureGoogleAccess(false);
+      await odSyncAll({ silent: true });
+    } catch (e) {
+      settings.syncPending = true;
+      saveSettings();
+      setOdStatus('err', 'Reconectar');
     }
-  }, mins * 60 * 1000);
+  }, 60 * 1000);
 };
 
-if (settings.autoSync === undefined) { settings.autoSync = true; settings.autoSyncInterval = 30; saveSettings(); }
+settings.autoSync = true; settings.autoSyncInterval = 1; saveSettings();
+
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden) {
+    startAutoSync();
+    if (settings.odClientId) {
+      try {
+        await ensureGoogleAccess(false);
+        await odSyncAll({ silent: true });
+      } catch {}
+    }
+  }
+});
 
 // ===== INIT =====
 restoreLargestLocalDataset();
